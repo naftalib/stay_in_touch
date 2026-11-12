@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildNav,
   siblingLabelsForChild,
+  siblingLabelsFromAudience,
   type NavSpace,
 } from './buildNav.ts'
 
@@ -108,5 +109,14 @@ describe('buildNav', () => {
     expect(items.every((i) => i.type === 'space' || i.type === 'sibling')).toBe(
       true,
     )
+  })
+
+  it('derives sibling labels from general audience', () => {
+    const siblings = siblingLabelsFromAudience('Noa', [
+      { label: 'Noa', role: 'member' },
+      { label: 'Ari', role: 'member' },
+      { label: 'Mom', role: 'admin' },
+    ])
+    expect(siblings).toEqual([{ label: 'Ari' }])
   })
 })

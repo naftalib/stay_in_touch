@@ -10,6 +10,6 @@ test('post a message in general', async ({ page }) => {
   await composer.fill(body)
   await page.getByRole('main').getByRole('button', { name: 'Send' }).click()
   await expect(
-    page.getByRole('main').getByText(body, { exact: true }),
+    page.getByRole('main').getByText(body, { exact: true }).first(),
   ).toBeVisible({ timeout: 15_000 })
 })

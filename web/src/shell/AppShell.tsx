@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link, Outlet, useMatch, useParams } from 'react-router'
 import {
   Button,
@@ -9,12 +10,13 @@ import {
 } from 'react-aria-components'
 import { useAuth } from '../auth/AuthContext.tsx'
 import { useFamily } from '../family/FamilyProvider.tsx'
-import { useMembers } from '../family/useMembers.ts'
+import { fetchSpaceAudience } from '../family/fetchSpaceAudience.ts'
 import { useSpaces } from '../family/useSpaces.ts'
 import { useUnreadCounts } from '../family/useUnreadCounts.ts'
+import { queryKeys } from '../lib/queryKeys.ts'
 import {
   buildNav,
-  siblingLabelsForChild,
+  siblingLabelsFromAudience,
   type NavSpace,
 } from './buildNav.ts'
 import SideNav from './SideNav.tsx'
@@ -36,9 +38,9 @@ export default function AppShell() {
 
   const { membership, role, memberId } = useFamily()
   const { signOut, displayName } = useAuth()
-  const spacesQuery = useSpaces(familyId ?? membership.family_id)
-  const membersQuery = useMembers(familyId ?? membership.family_id)
-  const unreadQuery = useUnreadCounts(familyId ?? membership.family_id)
+  const activeFamilyId = familyId ?? membership.family_id
+  const spacesQuery = useSpaces(activeFamilyId)
+  const unreadQuery = useUnreadCounts(activeFamilyId)
   const { offline } = useOnlineStatus()
   const { paused } = useRealtimeConnection()
 
@@ -80,13 +82,26 @@ export default function AppShell() {
     [spacesQuery.data, unreadMap],
   )
 
+  const generalSpaceId = useMemo(
+    () => navSpaces.find((space) => space.kind === 'general')?.id,
+    [navSpaces],
+  )
+
+  const generalAudienceQuery = useQuery({
+    queryKey: queryKeys.audience(generalSpaceId ?? 'none'),
+    queryFn: () => fetchSpaceAudience(generalSpaceId!),
+    enabled: role === 'member' && Boolean(generalSpaceId),
+  })
+
   const siblings = useMemo(() => {
-    if (role !== 'member' || !membersQuery.data) return []
-    return siblingLabelsForChild(memberId, membersQuery.data)
-  }, [memberId, membersQuery.data, role])
+    if (role !== 'member' || !generalAudienceQuery.data) return []
+    return siblingLabelsFromAudience(
+      membership.label,
+      generalAudienceQuery.data,
+    )
+  }, [generalAudienceQuery.data, membership.label, role])
 
   const navItems = buildNav(role, memberId, navSpaces, siblings)
-  const activeFamilyId = familyId ?? membership.family_id
   const activeSpace = spacesQuery.data?.find((s) => s.id === activeSpaceId)
 
   const totalUnread = useMemo(

@@ -1,16 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { getSupabase } from '../lib/supabase.ts'
+import { fetchSpaceAudience } from '../family/fetchSpaceAudience.ts'
 import { queryKeys } from '../lib/queryKeys.ts'
 import styles from './AudienceLine.module.css'
-
-async function fetchAudience(spaceId: string) {
-  const supabase = getSupabase()
-  const { data, error } = await supabase.rpc('space_audience', {
-    p_space_id: spaceId,
-  })
-  if (error) throw error
-  return data ?? []
-}
 
 type AudienceLineProps = {
   spaceId: string
@@ -33,7 +24,7 @@ function formatAudienceList(
 export default function AudienceLine({ spaceId }: AudienceLineProps) {
   const query = useQuery({
     queryKey: queryKeys.audience(spaceId),
-    queryFn: () => fetchAudience(spaceId),
+    queryFn: () => fetchSpaceAudience(spaceId),
     enabled: Boolean(spaceId),
   })
 

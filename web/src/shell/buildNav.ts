@@ -106,3 +106,14 @@ export function siblingLabelsForChild(
     .map((m) => ({ label: m.label }))
     .sort((a, b) => a.label.localeCompare(b.label))
 }
+
+/** Sibling labels from General space audience (children can call space_audience on General). */
+export function siblingLabelsFromAudience(
+  myLabel: string,
+  audience: { label: string; role: FamilyRole }[],
+): NavSibling[] {
+  return audience
+    .filter((row) => row.role === 'member' && row.label !== myLabel)
+    .map((row) => ({ label: row.label }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+}
