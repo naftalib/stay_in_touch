@@ -50,7 +50,9 @@ export async function signInWithPassword(
   )
   await passwordPanel.getByRole('button', { name: 'Sign in' }).click()
   await expect(page).not.toHaveURL(/sign-in/, { timeout: 15_000 })
-  await expect(page).toHaveURL(/\/f\//, { timeout: 15_000 })
+  await expect(page).toHaveURL(/\/f\/[^/]+\/s\/[^/]+\/messages/, {
+    timeout: 15_000,
+  })
 }
 
 /** Opens the Spaces drawer on narrow viewports. */
