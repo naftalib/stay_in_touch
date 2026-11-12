@@ -729,6 +729,10 @@ export type Database = {
         Returns: string;
       };
       mark_space_read: { Args: { p_space_id: string }; Returns: undefined };
+      nav_child_sibling_labels: {
+        Args: { p_family_id: string };
+        Returns: { label: string }[];
+      };
       remove_member: { Args: { p_member_id: string }; Returns: undefined };
       rename_space: { Args: { p_space_id: string; p_title: string }; Returns: undefined };
       revoke_invitation: { Args: { p_invitation_id: string }; Returns: undefined };

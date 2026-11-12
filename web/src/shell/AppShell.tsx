@@ -9,14 +9,10 @@ import {
 } from 'react-aria-components'
 import { useAuth } from '../auth/AuthContext.tsx'
 import { useFamily } from '../family/FamilyProvider.tsx'
-import { useSpaceAudience } from '../family/useSpaceAudience.ts'
+import { useChildSiblingLabels } from '../family/useChildSiblingLabels.ts'
 import { useSpaces } from '../family/useSpaces.ts'
 import { useUnreadCounts } from '../family/useUnreadCounts.ts'
-import {
-  buildNav,
-  siblingLabelsFromAudience,
-  type NavSpace,
-} from './buildNav.ts'
+import { buildNav, type NavSpace } from './buildNav.ts'
 import SideNav from './SideNav.tsx'
 import SpaceTabs from './SpaceTabs.tsx'
 import ConnectionBanner from './ConnectionBanner.tsx'
@@ -34,7 +30,7 @@ export default function AppShell() {
   const matchSpace = useMatch('/f/:familyId/s/:spaceId/:tab')
   const activeSpaceId = matchSpace?.params.spaceId ?? spaceId
 
-  const { membership, role, memberId, userId } = useFamily()
+  const { membership, role, memberId } = useFamily()
   const { signOut, displayName } = useAuth()
   const activeFamilyId = familyId ?? membership.family_id
   const spacesQuery = useSpaces(activeFamilyId)
@@ -80,25 +76,8 @@ export default function AppShell() {
     [spacesQuery.data, unreadMap],
   )
 
-  const generalSpaceId = useMemo(() => {
-    const listed = navSpaces.find((space) => space.kind === 'general')?.id
-    if (listed) return listed
-    // Before spaces resolve, the thread route already carries General's id.
-    if (navSpaces.length === 0 && matchSpace?.params.tab === 'messages') {
-      return matchSpace.params.spaceId
-    }
-    return undefined
-  }, [matchSpace?.params.spaceId, matchSpace?.params.tab, navSpaces])
-
-  const generalAudienceQuery = useSpaceAudience(
-    generalSpaceId,
-    role === 'member',
-  )
-
-  const siblings = useMemo(() => {
-    if (role !== 'member' || !generalAudienceQuery.data) return []
-    return siblingLabelsFromAudience(userId, generalAudienceQuery.data)
-  }, [generalAudienceQuery.data, role, userId])
+  const siblingLabelsQuery = useChildSiblingLabels(activeFamilyId, role)
+  const siblings = siblingLabelsQuery.data ?? []
 
   const navItems = buildNav(role, memberId, navSpaces, siblings)
   const activeSpace = spacesQuery.data?.find((s) => s.id === activeSpaceId)
