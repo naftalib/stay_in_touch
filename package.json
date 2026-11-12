@@ -15,7 +15,7 @@
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
     "db:lint": "supabase db lint --fail-on error && supabase db advisors --type security --level warn --fail-on warn",
-    "db:types": "supabase gen types typescript --local > web/src/lib/database.types.ts",
+    "db:types": "supabase gen types typescript --local > web/src/lib/database.types.ts && pnpm exec oxfmt web/src/lib/database.types.ts",
     "test": "pnpm --filter web test",
     "test:e2e": "pnpm --filter web test:e2e"
   }

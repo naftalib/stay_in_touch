@@ -6,7 +6,7 @@ import {
   MenuTrigger,
   Popover,
 } from 'react-aria-components'
-import type { FamilyRole } from '../lib/database.types.ts'
+import type { FamilyRole } from '../lib/database.helpers.ts'
 import type { ThreadMessage } from './types.ts'
 import QuotedMessage from './QuotedMessage.tsx'
 import styles from './MessageItem.module.css'

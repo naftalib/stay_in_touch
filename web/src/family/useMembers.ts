@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { getSupabase } from '../lib/supabase.ts'
 import { queryKeys } from '../lib/queryKeys.ts'
-import type { FamilyMember } from '../lib/database.types.ts'
+import type { FamilyMember } from '../lib/database.helpers.ts'
 
 async function fetchMembers(familyId: string): Promise<FamilyMember[]> {
   const supabase = getSupabase()

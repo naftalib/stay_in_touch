@@ -1,5 +1,5 @@
 import { getSupabase } from '../lib/supabase.ts'
-import type { FamilyMember } from '../lib/database.types.ts'
+import type { FamilyMember } from '../lib/database.helpers.ts'
 import {
   MESSAGES_PAGE_SIZE,
   type MessageCursor,

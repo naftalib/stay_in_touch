@@ -1,4 +1,4 @@
-import type { Family, FamilyMember, FamilyRole } from '../lib/database.types.ts'
+import type { Family, FamilyMember, FamilyRole } from '../lib/database.helpers.ts'
 
 export type ActiveMembership = FamilyMember & {
   family: Pick<Family, 'id' | 'name'>

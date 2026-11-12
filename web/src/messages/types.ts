@@ -1,4 +1,4 @@
-import type { Message } from '../lib/database.types.ts'
+import type { Message } from '../lib/database.helpers.ts'
 
 /** Message row enriched for thread display (labels filled by queries). */
 export type ThreadMessage = Message & {

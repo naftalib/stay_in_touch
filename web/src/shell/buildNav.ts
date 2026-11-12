@@ -1,4 +1,4 @@
-import type { FamilyRole, SpaceKind } from '../lib/database.types.ts'
+import type { FamilyRole, SpaceKind } from '../lib/database.helpers.ts'
 
 export type NavSpace = {
   id: string

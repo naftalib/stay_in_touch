@@ -73,11 +73,28 @@ select is(
   'after restore everyone with space access can see the media again'
 );
 
+reset role;
+insert into public.media (
+  id, space_id, family_id, uploader_member_id, kind, r2_key, content_type, status, provider, created_by
+)
+values (
+  'b5000000-0000-4000-8000-0000000000d2',
+  'b3000000-0000-4000-8000-000000000001',
+  'b0000000-0000-4000-8000-000000000001',
+  'b2000000-0000-4000-8000-000000000001',
+  'photo',
+  'f/b0000000-0000-4000-8000-000000000001/s/b3000000-0000-4000-8000-000000000001/b5000000-0000-4000-8000-0000000000d2/original.jpg',
+  'image/jpeg',
+  'ready',
+  'r2',
+  'b1000000-0000-4000-8000-000000000001'
+);
+
 select test.login('grandma@fixture.test');
 set local role authenticated;
 select ok(
   exists (
-    select 1 from public.media where id = 'b5000000-0000-4000-8000-000000000010' and message_id is null
+    select 1 from public.media where id = 'b5000000-0000-4000-8000-0000000000d2' and message_id is null
   ),
   'standalone media without message_id is unaffected'
 );
