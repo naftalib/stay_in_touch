@@ -120,7 +120,6 @@ select is(
 );
 
 -- Known gaps (TODO until fixed).
-select todo_start('Finding: broadcast payload carries the deleted body to every subscriber');
 select is(
   (
     select payload -> 'record' ->> 'body'
@@ -130,9 +129,7 @@ select is(
   ),
   NULL, 'the soft-delete broadcast does not include the deleted body'
 );
-select todo_end();
 
-select todo_start('Finding: dblink is left installed and executable by API roles');
 select ok(
   not exists (
     select 1
@@ -147,7 +144,6 @@ select ok(
   ),
   'anon and authenticated cannot execute dblink functions'
 );
-select todo_end();
 
 select * from finish();
 rollback;

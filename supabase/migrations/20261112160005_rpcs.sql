@@ -179,6 +179,12 @@ begin
 
   perform private.assert_family_admin(target.family_id);
 
+  -- Serialize last-admin checks with a concurrent remove or demote.
+  perform 1
+  from public.families
+  where id = target.family_id
+  for update;
+
   if target.status <> 'active' then
     raise exception 'member is already removed'
       using errcode = '42501';
@@ -233,9 +239,23 @@ begin
 
   perform private.assert_family_admin(target.family_id);
 
+  perform 1
+  from public.families
+  where id = target.family_id
+  for update;
+
   if target.status <> 'active' then
     raise exception 'cannot change the role of a removed member'
       using errcode = '42501';
+  end if;
+
+  if p_role = 'grandparent' and exists (
+    select 1
+    from public.spaces s
+    where s.owner_member_id = target.id
+  ) then
+    raise exception 'grandparents do not get a space'
+      using errcode = '22023';
   end if;
 
   if target.role = 'admin' and p_role <> 'admin' then
@@ -399,8 +419,44 @@ begin
 end;
 $$;
 
--- Matches the signed-in user's auth.users email (not a client-supplied email
--- or role). A removed member accepting a new invite is reactivated in place.
+create or replace function public.unarchive_space(p_space_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  target public.spaces%rowtype;
+begin
+  select * into target from public.spaces where id = p_space_id;
+  if not found then
+    raise exception 'space not found'
+      using errcode = '42501';
+  end if;
+
+  perform private.assert_family_admin(target.family_id);
+
+  if target.archived_at is null then
+    return;
+  end if;
+
+  update public.spaces
+  set archived_at = null
+  where id = target.id;
+
+  perform private.write_audit(
+    target.family_id,
+    'space.unarchived',
+    target.id::text,
+    jsonb_build_object('title', target.title)
+  );
+end;
+$$;
+
+-- Matches the signed-in user's confirmed auth.users email, not a client-supplied
+-- email or role. A parent cannot accept a child's +alias invite while signed
+-- in as the parent: the alias is its own user, and the emails do not match.
+-- A removed member accepting a new invite is reactivated in place.
 create or replace function public.accept_invite(p_invitation_id uuid)
 returns uuid
 language plpgsql
@@ -410,6 +466,7 @@ as $$
 declare
   actor uuid := (select auth.uid());
   actor_email text;
+  actor_confirmed timestamptz;
   invite public.invitations%rowtype;
   member_id uuid;
 begin
@@ -418,23 +475,25 @@ begin
       using errcode = '42501';
   end if;
 
-  select u.email into actor_email from auth.users u where u.id = actor;
-  if actor_email is null then
+  select u.email, u.email_confirmed_at
+    into actor_email, actor_confirmed
+  from auth.users u
+  where u.id = actor;
+  if actor_email is null or actor_confirmed is null then
     raise exception 'sign in required'
       using errcode = '42501';
   end if;
 
-  select * into invite from public.invitations where id = p_invitation_id;
+  select * into invite
+  from public.invitations
+  where id = p_invitation_id
+  for update;
   if not found or lower(invite.email) <> lower(actor_email) then
     raise exception 'invitation not found'
       using errcode = '42501';
   end if;
 
   if invite.status = 'pending' and invite.expires_at <= pg_catalog.now() then
-    update public.invitations
-    set status = 'expired'
-    where id = invite.id
-      and status = 'pending';
     raise exception 'invitation has expired'
       using errcode = '42501';
   end if;
@@ -485,28 +544,42 @@ begin
   returning id into member_id;
 
   if invite.create_space then
-    insert into public.spaces (
-      family_id,
-      kind,
-      owner_member_id,
-      title,
-      sort_order,
-      created_by
-    )
-    values (
-      invite.family_id,
-      'member',
-      member_id,
-      invite.label,
-      10,
-      actor
-    );
+    if exists (
+      select 1 from public.spaces s where s.owner_member_id = member_id
+    ) then
+      update public.spaces
+      set archived_at = null
+      where owner_member_id = member_id
+        and archived_at is not null;
+    else
+      insert into public.spaces (
+        family_id,
+        kind,
+        owner_member_id,
+        title,
+        sort_order,
+        created_by
+      )
+      values (
+        invite.family_id,
+        'member',
+        member_id,
+        invite.label,
+        10,
+        actor
+      );
+    end if;
   end if;
 
   update public.invitations
   set status = 'accepted',
       accepted_user_id = actor
-  where id = invite.id;
+  where id = invite.id
+    and status = 'pending';
+  if not found then
+    raise exception 'invitation is not pending'
+      using errcode = '42501';
+  end if;
 
   perform private.write_audit(
     invite.family_id,
@@ -546,17 +619,9 @@ begin
 
   return query
   select p.id, p.display_name, fm.label, fm.role
-  from public.spaces s
-  join public.family_members fm
-    on fm.family_id = s.family_id
-   and fm.status = 'active'
+  from public.family_members fm
   join public.profiles p on p.id = fm.user_id
-  where s.id = p_space_id
-    and (
-      fm.role in ('admin', 'grandparent')
-      or s.kind = 'general'
-      or fm.id = s.owner_member_id
-    )
+  where fm.id in (select private.space_viewer_member_ids(p_space_id))
   order by fm.label, p.display_name;
 end;
 $$;
@@ -588,38 +653,49 @@ begin
   select
     s.id,
     (
+      -- One item per message. Attached media does not add another.
       select count(*)::bigint
       from public.messages msg
       where msg.space_id = s.id
         and msg.deleted_at is null
-        and msg.author_member_id <> caller_member
-        and msg.created_at > coalesce(
+        and (
           (
-            select sr.last_read_at
-            from public.space_reads sr
-            where sr.space_id = s.id
-              and sr.member_id = caller_member
-          ),
-          '-infinity'::timestamptz
+            msg.author_member_id <> caller_member
+            and msg.created_at > read_at.last_read_at
+          )
+          or exists (
+            select 1
+            from public.media med
+            where med.message_id = msg.id
+              and med.space_id = s.id
+              and med.deleted_at is null
+              and med.uploader_member_id <> caller_member
+              and med.created_at > read_at.last_read_at
+          )
         )
     )
     + (
+      -- Standalone media, not attached to a message, is its own item.
       select count(*)::bigint
       from public.media med
       where med.space_id = s.id
+        and med.message_id is null
         and med.deleted_at is null
         and med.uploader_member_id <> caller_member
-        and med.created_at > coalesce(
-          (
-            select sr.last_read_at
-            from public.space_reads sr
-            where sr.space_id = s.id
-              and sr.member_id = caller_member
-          ),
-          '-infinity'::timestamptz
-        )
+        and med.created_at > read_at.last_read_at
     )
   from public.spaces s
+  cross join lateral (
+    select coalesce(
+      (
+        select sr.last_read_at
+        from public.space_reads sr
+        where sr.space_id = s.id
+          and sr.member_id = caller_member
+      ),
+      '-infinity'::timestamptz
+    ) as last_read_at
+  ) read_at
   where s.family_id = p_family_id
     and s.id in (select private.viewable_space_ids())
   order by s.sort_order, s.created_at;
@@ -669,6 +745,7 @@ revoke all on function public.change_member_role(uuid, public.family_role) from 
 revoke all on function public.create_member_space(uuid, uuid, text) from public, anon;
 revoke all on function public.rename_space(uuid, text) from public, anon;
 revoke all on function public.archive_space(uuid) from public, anon;
+revoke all on function public.unarchive_space(uuid) from public, anon;
 revoke all on function public.accept_invite(uuid) from public, anon;
 revoke all on function public.space_audience(uuid) from public, anon;
 revoke all on function public.unread_counts(uuid) from public, anon;
@@ -681,6 +758,7 @@ grant execute on function public.change_member_role(uuid, public.family_role) to
 grant execute on function public.create_member_space(uuid, uuid, text) to authenticated;
 grant execute on function public.rename_space(uuid, text) to authenticated;
 grant execute on function public.archive_space(uuid) to authenticated;
+grant execute on function public.unarchive_space(uuid) to authenticated;
 grant execute on function public.accept_invite(uuid) to authenticated;
 grant execute on function public.space_audience(uuid) to authenticated;
 grant execute on function public.unread_counts(uuid) to authenticated;
@@ -693,6 +771,7 @@ grant execute on function public.change_member_role(uuid, public.family_role) to
 grant execute on function public.create_member_space(uuid, uuid, text) to service_role;
 grant execute on function public.rename_space(uuid, text) to service_role;
 grant execute on function public.archive_space(uuid) to service_role;
+grant execute on function public.unarchive_space(uuid) to service_role;
 grant execute on function public.accept_invite(uuid) to service_role;
 grant execute on function public.space_audience(uuid) to service_role;
 grant execute on function public.unread_counts(uuid) to service_role;

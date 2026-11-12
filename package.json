@@ -14,6 +14,6 @@
     "db:start": "supabase start",
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
-    "db:lint": "supabase db lint --fail-on error && supabase db advisors --type security --level warn"
+    "db:lint": "supabase db lint --fail-on error && supabase db advisors --type security --level warn --fail-on warn"
   }
 }

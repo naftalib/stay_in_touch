@@ -1,9 +1,12 @@
--- Broadcast database changes to private Realtime channels named space:<space_id>.
+-- Broadcast a minimal change notice to private Realtime channels named
+-- space:<space_id>. The payload has id, space, and operation. It does not
+-- include the body, caption, or object keys. Clients refetch under RLS.
+-- A member removed after they subscribed keeps the socket until the token
+-- refreshes, but they no longer receive the content, and REST will not
+-- return it.
 -- Soft deletes are updates, so they travel on the same path as edits.
 -- Clients do not get an insert policy, so they cannot publish on these topics.
 -- The trigger function lives in private so it is not a Data API endpoint.
--- Docs: https://supabase.com/docs/guides/realtime/subscribing-to-database-changes
--- and https://supabase.com/docs/guides/realtime/authorization
 
 create or replace function private.broadcast_space_change()
 returns trigger
@@ -13,16 +16,70 @@ set search_path = ''
 as $$
 declare
   changed_space uuid := coalesce(new.space_id, old.space_id);
+  msg_new public.messages;
+  msg_old public.messages;
+  med_new public.media;
+  med_old public.media;
 begin
-  perform realtime.broadcast_changes(
-    'space:' || changed_space::text,
-    tg_op,
-    tg_op,
-    tg_table_name,
-    tg_table_schema,
-    new,
-    old
-  );
+  if tg_table_name = 'messages' then
+    msg_new := new;
+    msg_new.body := null;
+    if tg_op = 'UPDATE' then
+      msg_old := old;
+      msg_old.body := null;
+      perform realtime.broadcast_changes(
+        'space:' || changed_space::text,
+        tg_op,
+        tg_op,
+        tg_table_name,
+        tg_table_schema,
+        msg_new,
+        msg_old
+      );
+    else
+      perform realtime.broadcast_changes(
+        'space:' || changed_space::text,
+        tg_op,
+        tg_op,
+        tg_table_name,
+        tg_table_schema,
+        msg_new,
+        null
+      );
+    end if;
+  else
+    med_new := new;
+    med_new.caption := null;
+    med_new.r2_key := null;
+    med_new.thumb_key := null;
+    med_new.provider_asset_id := null;
+    if tg_op = 'UPDATE' then
+      med_old := old;
+      med_old.caption := null;
+      med_old.r2_key := null;
+      med_old.thumb_key := null;
+      med_old.provider_asset_id := null;
+      perform realtime.broadcast_changes(
+        'space:' || changed_space::text,
+        tg_op,
+        tg_op,
+        tg_table_name,
+        tg_table_schema,
+        med_new,
+        med_old
+      );
+    else
+      perform realtime.broadcast_changes(
+        'space:' || changed_space::text,
+        tg_op,
+        tg_op,
+        tg_table_name,
+        tg_table_schema,
+        med_new,
+        null
+      );
+    end if;
+  end if;
   return null;
 end;
 $$;

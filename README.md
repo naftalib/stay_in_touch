@@ -28,16 +28,14 @@ docs/                 Architecture, decisions, hosted settings
 ```bash
 pnpm install
 supabase start
-pnpm dev
-```
-
-The web app reads env from the repo root (`vite.config.ts` sets `envDir` to `..`).
-
-```bash
 cp .env.example .env
 ```
 
-After `supabase start`, copy the local API URL and the **publishable** key into `.env`. Do not put the secret key in `VITE_SUPABASE_PUBLISHABLE_KEY`. `.env` is gitignored.
+The web app reads env from the repo root (`vite.config.ts` sets `envDir` to `..`). After `supabase start`, copy the local API URL and the **publishable** key into `.env`. Do not put the secret key in `VITE_SUPABASE_PUBLISHABLE_KEY`. `.env` is gitignored. Then:
+
+```bash
+pnpm dev
+```
 
 Other commands:
 

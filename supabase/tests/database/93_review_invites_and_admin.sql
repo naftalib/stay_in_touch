@@ -205,10 +205,10 @@ select throws_ok(
   '23503', NULL, 'a member removed moments ago cannot post'
 );
 
--- Archived spaces: documented as still postable. Assert it so a change is deliberate.
+-- Archived spaces are read-only, including for the admin who archived them.
 select test.login('mom@fixture.test');
-select is(
-  test.rows($$
+select throws_ok(
+  $$
     insert into public.messages (space_id, family_id, author_member_id, body, created_by)
     values (
       'b3000000-0000-4000-8000-000000000005',
@@ -217,12 +217,11 @@ select is(
       'Posting into an archived space',
       'b1000000-0000-4000-8000-000000000001'
     )
-  $$),
-  1, 'archived spaces stay postable (documented open question)'
+  $$,
+  '42501', NULL, 'an admin cannot post in an archived space'
 );
 
 -- Known gaps (TODO until fixed).
-select todo_start('Finding: re-inviting a removed member who owns a space with create_space fails');
 reset role;
 update public.family_members set status = 'removed', removed_at = now() where id = 'b2000000-0000-4000-8000-000000000005';
 insert into public.invitations (id, family_id, email, role, label, create_space, invited_by, expires_at)
@@ -238,15 +237,12 @@ select lives_ok(
   $$select public.accept_invite('b6000000-0000-4000-8000-000000000012')$$,
   'a returning child with an existing space can accept a create_space invitation'
 );
-select todo_end();
 
-select todo_start('Finding: a space owner can be changed to grandparent, who should have no space');
 select test.login('mom@fixture.test');
 select throws_ok(
   $$select public.change_member_role('b2000000-0000-4000-8000-000000000002', 'grandparent')$$,
   '22023', NULL, 'change_member_role refuses to make a space owner a grandparent'
 );
-select todo_end();
 
 select * from finish();
 rollback;

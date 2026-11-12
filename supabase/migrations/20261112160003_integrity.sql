@@ -18,7 +18,11 @@ begin
     new.id,
     coalesce(
       nullif(btrim(new.raw_user_meta_data ->> 'display_name'), ''),
-      nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
+      -- A plus-alias such as mom+noa is not a display name.
+      case
+        when split_part(coalesce(new.email, ''), '@', 1) like '%+%' then null
+        else nullif(split_part(coalesce(new.email, ''), '@', 1), '')
+      end,
       'Member'
     )
   );
@@ -78,6 +82,8 @@ begin
   if tg_op = 'INSERT' then
     if is_client then
       new.created_at := pg_catalog.now();
+      new.edited_at := null;
+      new.deleted_at := null;
       if not exists (
         select 1
         from private.my_memberships() m
@@ -107,6 +113,11 @@ begin
       using errcode = '42501';
   end if;
 
+  if is_client and old.deleted_at is not null and new.body is distinct from old.body then
+    raise exception 'a deleted message cannot be edited'
+      using errcode = '42501';
+  end if;
+
   if new.body is distinct from old.body then
     if is_client and not private.caller_owns_member(old.author_member_id) then
       raise exception 'only the author can edit a message'
@@ -117,13 +128,24 @@ begin
     new.edited_at := old.edited_at;
   end if;
 
-  if new.deleted_at is distinct from old.deleted_at
-     and is_client
-     and not private.caller_owns_member(old.author_member_id)
-     and not private.is_family_admin(old.family_id)
-  then
-    raise exception 'only the author or an admin can delete a message'
-      using errcode = '42501';
+  if is_client and new.deleted_at is distinct from old.deleted_at then
+    if old.deleted_at is null then
+      if not private.caller_owns_member(old.author_member_id)
+         and not private.is_family_admin(old.family_id)
+      then
+        raise exception 'only the author or an admin can delete a message'
+          using errcode = '42501';
+      end if;
+      new.deleted_at := pg_catalog.now();
+    elsif new.deleted_at is null then
+      if not private.is_family_admin(old.family_id) then
+        raise exception 'only an admin can restore a deleted message'
+          using errcode = '42501';
+      end if;
+    else
+      raise exception 'deleted_at cannot be changed'
+        using errcode = '42501';
+    end if;
   end if;
 
   return new;
@@ -175,6 +197,14 @@ begin
   if tg_op = 'INSERT' then
     if is_client then
       new.created_at := pg_catalog.now();
+      new.deleted_at := null;
+      new.status := 'pending';
+      new.provider := 'r2';
+      new.provider_asset_id := null;
+      new.size_bytes := null;
+      new.width := null;
+      new.height := null;
+      new.duration_s := null;
       if not exists (
         select 1
         from private.my_memberships() m
@@ -214,17 +244,32 @@ begin
     is_uploader := private.caller_owns_member(old.uploader_member_id);
     is_admin := private.is_family_admin(old.family_id);
 
+    if old.deleted_at is not null and new.caption is distinct from old.caption then
+      raise exception 'deleted media cannot be edited'
+        using errcode = '42501';
+    end if;
+
     if new.caption is distinct from old.caption and not is_uploader then
       raise exception 'only the uploader can edit a media caption'
         using errcode = '42501';
     end if;
 
-    if new.deleted_at is distinct from old.deleted_at
-       and not is_uploader
-       and not is_admin
-    then
-      raise exception 'only the uploader or an admin can delete media'
-        using errcode = '42501';
+    if new.deleted_at is distinct from old.deleted_at then
+      if old.deleted_at is null then
+        if not is_uploader and not is_admin then
+          raise exception 'only the uploader or an admin can delete media'
+            using errcode = '42501';
+        end if;
+        new.deleted_at := pg_catalog.now();
+      elsif new.deleted_at is null then
+        if not is_admin then
+          raise exception 'only an admin can restore deleted media'
+            using errcode = '42501';
+        end if;
+      else
+        raise exception 'deleted_at cannot be changed'
+          using errcode = '42501';
+      end if;
     end if;
 
     if new.status is distinct from old.status

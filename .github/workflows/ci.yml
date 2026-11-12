@@ -38,4 +38,4 @@ jobs:
       - name: Lint
         run: supabase db lint --fail-on error
       - name: Security advisors
-        run: supabase db advisors --type security --level warn --fail-on error
+        run: supabase db advisors --type security --level warn --fail-on warn

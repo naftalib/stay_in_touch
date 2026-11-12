@@ -9,8 +9,9 @@ create table public.profiles (
   created_at timestamptz not null default pg_catalog.now(),
   updated_at timestamptz not null default pg_catalog.now(),
   constraint profiles_display_name_not_blank check (char_length(btrim(display_name)) > 0),
-  constraint profiles_avatar_key_has_no_email check (
-    avatar_key is null or position('@' in avatar_key) = 0
+  constraint profiles_avatar_key_shape check (
+    avatar_key is null
+    or avatar_key ~ ('^u/' || id::text || '/avatar/[a-z0-9.]+$')
   )
 );
 

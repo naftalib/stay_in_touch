@@ -3,7 +3,7 @@ select set_config('search_path', 'public, extensions', true);
 
 \ir _fixtures.sql.inc
 
-select plan(9);
+select plan(10);
 
 select has_trigger(
   'public',
@@ -35,6 +35,14 @@ values
     '{}'::jsonb,
     'INSERT',
     true
+  ),
+  (
+    'b8000000-0000-4000-8000-000000000003',
+    'space:b3000000-0000-4000-8000-000000000004',
+    'broadcast',
+    '{}'::jsonb,
+    'INSERT',
+    true
   );
 
 select test.login('noa@fixture.test');
@@ -52,9 +60,13 @@ select ok(
   exists (
     select 1
     from realtime.messages
-    where id = 'b8000000-0000-4000-8000-000000000001'
+    where id = 'b8000000-0000-4000-8000-000000000003'
   ),
-  'a child can receive broadcasts while subscribed to their own space'
+  'a child can receive broadcasts for their own space topic'
+);
+select is_empty(
+  $$select 1 from realtime.messages where id = 'b8000000-0000-4000-8000-000000000001'$$,
+  'a child subscribed to their own space cannot read a parent topic row'
 );
 select is_empty(
   $$select 1 from realtime.messages where id = 'b8000000-0000-4000-8000-000000000002'$$,

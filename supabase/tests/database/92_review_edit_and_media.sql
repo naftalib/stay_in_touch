@@ -181,7 +181,6 @@ select throws_ok(
 );
 
 -- Known gaps (TODO until fixed).
-select todo_start('Finding: the author can undo an admin moderation delete');
 reset role;
 update public.messages set deleted_at = now() where id = 'b4000000-0000-4000-8000-000000000006';
 select test.login('grandma@fixture.test');
@@ -194,9 +193,7 @@ select is(
   test.rows($$update public.messages set body = 'Edited while deleted' where id = 'b4000000-0000-4000-8000-000000000006'$$),
   0, 'an author cannot edit a post after it was deleted'
 );
-select todo_end();
 
-select todo_start('Finding: clients set server-owned fields on insert');
 select throws_ok(
   $$
     insert into public.media (
@@ -231,9 +228,7 @@ select throws_ok(
   $$,
   '42501', NULL, 'a client cannot insert a message with edited_at or deleted_at preset'
 );
-select todo_end();
 
-select todo_start('Finding: avatar_key can reference a private media object');
 select test.login('noa@fixture.test');
 select throws_ok(
   $$
@@ -243,9 +238,7 @@ select throws_ok(
   $$,
   '23514', NULL, 'a child cannot point their avatar at a parent-space photo'
 );
-select todo_end();
 
-select todo_start('Finding: soft-deleted bodies stay readable by every viewer');
 reset role;
 update public.messages set deleted_at = now() where id = 'b4000000-0000-4000-8000-000000000001';
 select test.login('noa@fixture.test');
@@ -254,7 +247,6 @@ select is_empty(
   $$select 1 from public.messages where id = 'b4000000-0000-4000-8000-000000000001' and deleted_at is not null and body is not null$$,
   'a child cannot read the body of someone else''s soft-deleted message'
 );
-select todo_end();
 
 select * from finish();
 rollback;

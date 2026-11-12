@@ -16,7 +16,7 @@ Roles live on `family_members`, not on the profile and not in the JWT. One perso
 
 | Role | Who | Access |
 |---|---|---|
-| `admin` | Both parents | See and post in every space in the family. Invite, remove, change roles, create, rename, and archive spaces. Soft-delete anyone's post. Read `audit_log`. |
+| `admin` | Both parents | See every space in the family and post in the ones that are not archived. Invite, remove, change roles, create, rename, archive, and unarchive spaces. Soft-delete anyone's post in a space that is not archived. Read `audit_log`. |
 | `grandparent` | Grandparents | See and post, including photos and videos, in every space. Manage nothing. No space of their own. |
 | `member` | A child | See and post only in General and their own space. They cannot see a parent's or sibling's space, including the `spaces` row. |
 
@@ -47,7 +47,7 @@ Helpers live in the `private` schema, which is not in `api.schemas` (`public` an
 
 - `my_memberships()` — active memberships
 - `viewable_space_ids()` — spaces the caller may see
-- `postable_space_ids()` — same set for now, separate so a later read-only role can diverge
+- `postable_space_ids()` — viewable spaces whose `archived_at` is null. Archived spaces stay visible and reject inserts, edits, and soft-deletes for every role.
 - `is_family_admin(family_id)`
 - `caller_owns_member(member_id)`
 - `topic_space_id()` — parses the Realtime topic GUC
@@ -57,18 +57,24 @@ Policies are one per command, `to authenticated`, and use `space_id in (select p
 Clients have no insert or update grants on memberships, invitations, spaces, or the audit log. Those changes go through security-definer RPCs that check the caller and write `audit_log`:
 
 - `create_invitation`, `revoke_invitation`, `remove_member`, `change_member_role`
-- `create_member_space`, `rename_space`, `archive_space`
-- `accept_invite` — matches `auth.users.email`, uses the invitation's role, and creates a space only when the invitation says so
+- `create_member_space`, `rename_space`, `archive_space`, `unarchive_space`
+- `accept_invite` — matches the signed-in user's confirmed `auth.users.email`, uses the invitation's role, and creates a space only when the invitation says so. A `+alias` child is a separate user. A parent signs in as that child to accept. They cannot accept the invite while signed in as themselves.
+
+`unread_counts` counts a message and the media attached to it as one item. Media with `message_id` null counts as one item on its own. The caller's own content is skipped, and a soft-deleted message drops that item.
 
 Read RPCs are security invoker, so RLS still applies: `space_audience`, `unread_counts`, `mark_space_read`.
 
-Authors can edit their own body or caption and soft-delete. Admins can soft-delete anyone's post and cannot change the body. Identity columns (`space_id`, `family_id`, author, `created_at`) cannot change after insert. Clients have no `DELETE` grant on content.
+Authors can edit their own body or caption and soft-delete. Admins can soft-delete anyone's post and cannot change the body. A deleted post cannot be edited or restored by its author. Only an admin can clear `deleted_at`. Other members do not see a soft-deleted row. The author and the family's admins still can: Postgres checks the updated row against the select policy, so the person who deletes it has to be allowed to read it afterwards. Identity columns (`space_id`, `family_id`, author, `created_at`) cannot change after insert. Clients have no `DELETE` grant on content.
+
+Clients cannot set server-owned columns on insert. A message cannot arrive with `edited_at` or `deleted_at` already set. Media inserted by a client is `pending` / `r2`, with no asset id or file metadata. `profiles.avatar_key`, when set, must look like `u/{user_id}/avatar/{file}`.
 
 ## Realtime
 
-Inserts and updates of `messages` and `media` call `realtime.broadcast_changes()` on the topic `space:<space_id>`. Soft deletes are updates. There is no client insert policy on `realtime.messages`, so clients cannot publish.
+Inserts and updates of `messages` and `media` call `realtime.broadcast_changes()` on the topic `space:<space_id>`. Soft deletes are updates. The broadcast record keeps the id and the space, and omits the body, caption, and object keys. Clients refetch the row under RLS. There is no client insert policy on `realtime.messages`, so clients cannot publish.
 
-The select policy allows `authenticated` only when the extension is `broadcast` and `realtime.topic()` is `space:<id>` for an id in `viewable_space_ids()`. Clients must subscribe with `private: true` and `supabase.realtime.setAuth()`. On a hosted project, turn **Allow public access** off.
+The select policy allows `authenticated` only when the extension is `broadcast`, the row's topic equals `realtime.topic()`, and that topic is `space:<id>` for an id in `viewable_space_ids()`. Clients must subscribe with `private: true` and `supabase.realtime.setAuth()`. On a hosted project, turn **Allow public access** off.
+
+Realtime authorizes when the client joins and keeps that decision until the JWT is refreshed or the socket reconnects. REST access ends in the same transaction as `remove_member`. A socket that was already open can still receive the minimal notice. It cannot read the post. Keep `jwt_expiry` short on the hosted project.
 
 ## Media flow (later)
 

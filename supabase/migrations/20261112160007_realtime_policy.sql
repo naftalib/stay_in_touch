@@ -1,14 +1,13 @@
 -- Install the viewer select policy on realtime.messages.
 --
 -- The table is owned by supabase_realtime_admin and already has RLS enabled.
--- Hosted projects run migrations as a superuser and take the first branch.
--- Local CLI v3 runs them as a non-superuser `postgres` role, and membership
--- in supabase_realtime_admin is reserved for superusers, so the second branch
--- asks the local superuser to install the policy. The container name matches
--- project_id and the password is the CLI's published local default. This is
--- not a project secret, and the hostname does not exist on a hosted database.
-
-create extension if not exists dblink with schema extensions;
+-- Hosted postgres is not a superuser. The policy can be created directly only
+-- when the migration role can assume supabase_realtime_admin.
+-- Local CLI v3 cannot. This migration asks the local superuser, over the
+-- database container network, using the CLI's published local password, and
+-- then drops dblink so that path is not left for anon or authenticated.
+-- The password is not a project secret. A hosted database has no container
+-- by this name, so that branch fails closed instead of installing dblink.
 
 do $install$
 declare
@@ -20,6 +19,7 @@ declare
       to authenticated
       using (
         realtime.messages.extension = 'broadcast'
+        and realtime.messages.topic = realtime.topic()
         and private.topic_space_id() is not null
         and private.topic_space_id() in (select private.viewable_space_ids())
       )
@@ -33,6 +33,12 @@ begin
     return;
   end if;
 
+  -- Created and dropped in this transaction, so no other session can use it.
+  -- dblink_connect_u stays executable only by its owner. postgres cannot
+  -- revoke the public grant on the other functions (supabase_admin granted
+  -- it), which is why the extension must not remain.
+  execute 'create extension if not exists dblink with schema extensions';
+
   perform extensions.dblink_connect(
     'sit_realtime_policy',
     'host=supabase_db_stay-in-touch port=5432 dbname=' || current_database()
@@ -45,6 +51,7 @@ begin
   perform extensions.dblink_exec('sit_realtime_policy', drop_sql);
   perform extensions.dblink_exec('sit_realtime_policy', create_sql);
   perform extensions.dblink_disconnect('sit_realtime_policy');
+  execute 'drop extension if exists dblink';
 exception
   when others then
     begin
@@ -53,6 +60,14 @@ exception
       when others then
         null;
     end;
-    raise;
+    begin
+      execute 'drop extension if exists dblink';
+    exception
+      when others then
+        null;
+    end;
+    raise exception
+      'cannot install the realtime viewer policy. The migration role must be able to assume supabase_realtime_admin, or this must be the local CLI database. %',
+      sqlerrm;
 end
 $install$;
