@@ -65,4 +65,4 @@ Keyboard sign-in, posting, and the spaces drawer (Enter to open, Escape to close
 
 ## CI E2E duration
 
-Local preview run, 2026-11-12: 84 tests, Chromium + WebKit + iPhone 13, one worker, 1.7 minutes, no retries. The GitHub `e2e` job on this review commit is the CI measurement.
+GitHub Actions run [43325444730](https://github.com/naftalib/stay_in_touch/actions/runs/43325444730) on `3f6831f`: the `e2e` job took 4 minutes 6 seconds. Playwright reported 84 passed in 2.1 minutes (Chromium, WebKit, and iPhone 13, one worker, no retries). A local preview run the same day was 84 passed in 1.7 minutes. `web` took 23 seconds and `db` took 1 minute 15 seconds.
