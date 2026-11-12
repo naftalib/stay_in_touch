@@ -26,10 +26,17 @@ grant select on public.families to authenticated;
 grant select on public.family_members to authenticated;
 grant select on public.spaces to authenticated;
 
-grant select, insert on public.messages to authenticated;
+grant select on public.messages to authenticated;
+grant insert (
+  id, space_id, family_id, author_member_id, body, reply_to_id, created_by
+) on public.messages to authenticated;
 grant update (body, edited_at, deleted_at) on public.messages to authenticated;
 
-grant select, insert on public.media to authenticated;
+grant select on public.media to authenticated;
+grant insert (
+  id, space_id, family_id, uploader_member_id, message_id, kind,
+  r2_key, thumb_key, content_type, caption, created_by
+) on public.media to authenticated;
 grant update (caption, deleted_at) on public.media to authenticated;
 
 grant select on public.invitations to authenticated;
@@ -99,7 +106,14 @@ create policy spaces_select on public.spaces
 create policy messages_select on public.messages
   for select
   to authenticated
-  using (space_id in (select private.viewable_space_ids()));
+  using (
+    space_id in (select private.viewable_space_ids())
+    and (
+      deleted_at is null
+      or private.is_family_admin(family_id)
+      or author_member_id in (select m.member_id from private.my_memberships() m)
+    )
+  );
 
 create policy messages_insert on public.messages
   for insert
@@ -120,7 +134,10 @@ create policy messages_update on public.messages
   using (
     space_id in (select private.viewable_space_ids())
     and (
-      author_member_id in (select m.member_id from private.my_memberships() m)
+      (
+        deleted_at is null
+        and author_member_id in (select m.member_id from private.my_memberships() m)
+      )
       or private.is_family_admin(family_id)
     )
   )
@@ -135,7 +152,14 @@ create policy messages_update on public.messages
 create policy media_select on public.media
   for select
   to authenticated
-  using (space_id in (select private.viewable_space_ids()));
+  using (
+    space_id in (select private.viewable_space_ids())
+    and (
+      deleted_at is null
+      or private.is_family_admin(family_id)
+      or uploader_member_id in (select m.member_id from private.my_memberships() m)
+    )
+  );
 
 create policy media_insert on public.media
   for insert
@@ -156,7 +180,10 @@ create policy media_update on public.media
   using (
     space_id in (select private.viewable_space_ids())
     and (
-      uploader_member_id in (select m.member_id from private.my_memberships() m)
+      (
+        deleted_at is null
+        and uploader_member_id in (select m.member_id from private.my_memberships() m)
+      )
       or private.is_family_admin(family_id)
     )
   )

@@ -21,7 +21,10 @@ Decided items from the first handoff. Change this log when a decision changes.
 | pnpm workspaces. The web linter is oxlint. | The current Vite React TypeScript template ships oxlint rather than ESLint. |
 | `api/` is reserved and empty. Edge Functions are only a README. | Later handoffs. The folders already mean one thing each. |
 | Local demo password `local-dev-only` for `@example.test` accounts. | Seed must be sign-in-able locally and must never be run against a hosted project. |
-| Local Realtime policy is installed via `dblink` to `supabase_admin`. | CLI v3's `postgres` role is not a superuser and cannot own `realtime.messages`. Hosted `postgres` is a superuser and skips that branch. The password is the CLI's published local default, not a project secret. |
+| Local Realtime policy is installed via `dblink`, then the extension is dropped. | CLI v3's `postgres` role is not a superuser and cannot own `realtime.messages`. Hosted `postgres` is not a superuser either. The direct path works only when the migration role can assume `supabase_realtime_admin`. Otherwise the local CLI asks the local superuser, using the published local password, and drops `dblink` before the migration commits. | 
+| Archived spaces stay visible and postable. | Archive is a label for the client, not a second permission. Change this in `postable_space_ids()` if archive should become read-only. |
+| Soft-deleted posts stay in the table. Other members cannot read them. The author and admins can. Broadcasts omit the body. | Postgres checks the updated row against the select policy, so the person who deletes a post must still be allowed to read it. Everyone else refetches under RLS and gets nothing. A removed member's already-open socket can still get the notice until the JWT refreshes, but not the text. |
+| Unread counts include a message and its media separately. | Simple and derived from the two tables. Revisit if the UI should count a post once. |
 
 ## Additive on purpose
 

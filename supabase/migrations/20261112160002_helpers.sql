@@ -40,6 +40,30 @@ as $$
   )
 $$;
 
+-- Who may see one space. space_audience and viewable_space_ids both use this
+-- so a later role or space_grants change has one place to land.
+create or replace function private.space_viewer_member_ids(p_space_id uuid)
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select fm.id
+  from public.spaces s
+  join public.family_members fm
+    on fm.family_id = s.family_id
+   and fm.status = 'active'
+  join public.families f on f.id = s.family_id
+  where s.id = p_space_id
+    and f.deleted_at is null
+    and (
+      fm.role in ('admin', 'grandparent')
+      or s.kind = 'general'
+      or fm.id = s.owner_member_id
+    )
+$$;
+
 create or replace function private.viewable_space_ids()
 returns setof uuid
 language sql
@@ -47,12 +71,10 @@ stable
 security definer
 set search_path = ''
 as $$
-  select distinct s.id
+  select s.id
   from public.spaces s
   join private.my_memberships() m on m.family_id = s.family_id
-  where m.role in ('admin', 'grandparent')
-     or s.kind = 'general'
-     or s.owner_member_id = m.member_id
+  where m.member_id in (select private.space_viewer_member_ids(s.id))
 $$;
 
 -- Separate from viewable so a future read-only role can diverge.
@@ -112,6 +134,7 @@ $$;
 
 revoke all on function private.my_memberships() from public, anon;
 revoke all on function private.is_family_admin(uuid) from public, anon;
+revoke all on function private.space_viewer_member_ids(uuid) from public, anon;
 revoke all on function private.viewable_space_ids() from public, anon;
 revoke all on function private.postable_space_ids() from public, anon;
 revoke all on function private.caller_owns_member(uuid) from public, anon;
@@ -121,6 +144,7 @@ grant usage on schema private to authenticated, service_role;
 
 grant execute on function private.my_memberships() to authenticated;
 grant execute on function private.is_family_admin(uuid) to authenticated;
+grant execute on function private.space_viewer_member_ids(uuid) to authenticated;
 grant execute on function private.viewable_space_ids() to authenticated;
 grant execute on function private.postable_space_ids() to authenticated;
 grant execute on function private.caller_owns_member(uuid) to authenticated;
