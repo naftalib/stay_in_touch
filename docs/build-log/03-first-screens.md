@@ -58,6 +58,8 @@ VoiceOver and NVDA were not available on this Linux VM. Keyboard behavior and ax
 - PWA service worker (do not cache Supabase API).
 - Slim realtime payload to ids only server-side (UI already id-only).
 - Hebrew/RTL translations (logical CSS in place).
+- Shorten Supabase `jwt_expiry` (for example 10–15 minutes) and verify a removed member's open Realtime socket loses access within that window, with a test.
+- Manual screen-reader pass (VoiceOver on iOS Safari, TalkBack or NVDA) on sign-in, the thread, and the spaces drawer. The Linux review VM had none.
 
 ## Manual accessibility check
 
