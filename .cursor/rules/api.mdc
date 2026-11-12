@@ -1,0 +1,7 @@
+---
+description: Reserved FastAPI folder
+globs: api/**
+alwaysApply: false
+---
+
+`api/` is reserved for a later Python FastAPI service on Cloud Run. Do not add application code yet.

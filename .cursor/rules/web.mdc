@@ -1,0 +1,12 @@
+---
+description: Frontend rules for the Vite app
+globs: web/**
+alwaysApply: false
+---
+
+`web/` is UI only.
+
+- React Aria Components and CSS Modules. No Tailwind.
+- TypeScript `strict` stays on.
+- All data access goes through the Supabase client in `src/lib/supabase.ts` and row-level security. Do not put a secret or service-role key in the frontend.
+- Do not edit `supabase/` from a frontend task.

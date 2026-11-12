@@ -1,0 +1,75 @@
+# Architecture
+
+Stay In Touch is a private, invite-only family app. One family has a General space plus one space for each parent and child. Grandparents do not get a space. Each space holds photos, videos, and one flat message thread. A message may quote-reply to another message in the same space. There is no UI for this yet. This document is the database and access model the UI will sit on.
+
+## Stack
+
+- Frontend: Vite, React, TypeScript (`strict`), React Aria Components, CSS Modules. No Tailwind. The app will become a PWA and move to Cloudflare later.
+- Backend: Supabase only. Postgres with row-level security, Auth, Realtime Broadcast, and Edge Functions (not written yet).
+- Media: Cloudflare R2 later. The database stores object keys, never URLs. A later Edge Function will mint a short-lived signed URL after an RLS check.
+- Email and push later: Resend as Auth SMTP, Web Push via VAPID.
+- A FastAPI service on Cloud Run is reserved under `api/` and is not built.
+
+## Roles
+
+Roles live on `family_members`, not on the profile and not in the JWT. One person can belong to several families.
+
+| Role | Who | Access |
+|---|---|---|
+| `admin` | Both parents | See and post in every space in the family. Invite, remove, change roles, create, rename, and archive spaces. Soft-delete anyone's post. Read `audit_log`. |
+| `grandparent` | Grandparents | See and post, including photos and videos, in every space. Manage nothing. No space of their own. |
+| `member` | A child | See and post only in General and their own space. They cannot see a parent's or sibling's space, including the `spaces` row. |
+
+Everyone active can read the member list and the profiles of people who have any membership in their families, including removed members, so old posts stay attributed. A removed member sees nothing and cannot post. Their posts remain.
+
+## Data model
+
+UUID primary keys. `created_at` and `updated_at` on every table (`updated_at` is trigger-maintained). Content rows also carry `family_id`, kept consistent with the space by a composite foreign key and a `BEFORE` trigger.
+
+| Table | Purpose |
+|---|---|
+| `families` | Tenant. Soft-deleted with `deleted_at`. |
+| `profiles` | One row per auth user, created by a trigger on `auth.users`. Display name and optional avatar key. No role. |
+| `family_members` | `(family_id, user_id)` unique. Role, label, `active` or `removed`. |
+| `spaces` | `general` or `member`. One General per family. At most one space per owner. Owner must be in that family. |
+| `messages` | Flat thread. `reply_to_id` must be in the same space. Soft delete. |
+| `media` | R2 key `f/{family_id}/s/{space_id}/{media_id}/original.{ext}` and optional `thumb.jpg`. `provider` is `r2` or `mux`. |
+| `invitations` | Admin-created. Pending, accepted, revoked, or expired. |
+| `space_reads` | `(member_id, space_id)` and `last_read_at`. |
+| `push_subscriptions` | One device row, visible only to that user. |
+| `notification_prefs` | Per member, optionally per space. |
+| `notification_outbox` | Server only. No client grants. |
+| `audit_log` | Admins can read. Only security-definer RPCs write. |
+
+## Enforcement
+
+Helpers live in the `private` schema, which is not in `api.schemas` (`public` and `graphql_public` only), so PostgREST does not expose them. They are `security definer`, `stable`, and `search_path = ''`. `anon` cannot execute them. `authenticated` can execute the ones policies call, because a policy runs as the caller and Postgres checks `EXECUTE`. Each helper returns only the caller's own rows.
+
+- `my_memberships()` — active memberships
+- `viewable_space_ids()` — spaces the caller may see
+- `postable_space_ids()` — same set for now, separate so a later read-only role can diverge
+- `is_family_admin(family_id)`
+- `caller_owns_member(member_id)`
+- `topic_space_id()` — parses the Realtime topic GUC
+
+Policies are one per command, `to authenticated`, and use `space_id in (select private.viewable_space_ids())` and `(select auth.uid())`. Authorization does not use JWT custom claims, so removing someone takes effect before their token expires.
+
+Clients have no insert or update grants on memberships, invitations, spaces, or the audit log. Those changes go through security-definer RPCs that check the caller and write `audit_log`:
+
+- `create_invitation`, `revoke_invitation`, `remove_member`, `change_member_role`
+- `create_member_space`, `rename_space`, `archive_space`
+- `accept_invite` — matches `auth.users.email`, uses the invitation's role, and creates a space only when the invitation says so
+
+Read RPCs are security invoker, so RLS still applies: `space_audience`, `unread_counts`, `mark_space_read`.
+
+Authors can edit their own body or caption and soft-delete. Admins can soft-delete anyone's post and cannot change the body. Identity columns (`space_id`, `family_id`, author, `created_at`) cannot change after insert. Clients have no `DELETE` grant on content.
+
+## Realtime
+
+Inserts and updates of `messages` and `media` call `realtime.broadcast_changes()` on the topic `space:<space_id>`. Soft deletes are updates. There is no client insert policy on `realtime.messages`, so clients cannot publish.
+
+The select policy allows `authenticated` only when the extension is `broadcast` and `realtime.topic()` is `space:<id>` for an id in `viewable_space_ids()`. Clients must subscribe with `private: true` and `supabase.realtime.setAuth()`. On a hosted project, turn **Allow public access** off.
+
+## Media flow (later)
+
+The client will insert a `media` row in `pending`, upload bytes to the key stored on that row, and an Edge Function will mark it `ready` and hand out a signed URL. This handoff only stores the key.

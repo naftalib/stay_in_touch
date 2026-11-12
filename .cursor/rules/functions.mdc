@@ -1,0 +1,11 @@
+---
+description: Edge Function rules
+globs: supabase/functions/**
+alwaysApply: false
+---
+
+Edge Functions are Deno TypeScript in `supabase/functions/`. Shared code goes in `functions/_shared/`.
+
+- Use the caller's JWT when row-level security should apply.
+- Use the secret key only for work the caller must not do, and never return it.
+- Handle CORS in the function. The CLI does not add it locally.

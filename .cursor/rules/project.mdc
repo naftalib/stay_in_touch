@@ -1,0 +1,12 @@
+---
+description: Stay In Touch stack and repo boundaries
+alwaysApply: true
+---
+
+Stay In Touch is a private invite-only family app.
+
+- Frontend in `web/`: Vite, React, TypeScript `strict`, React Aria Components, CSS Modules. No Tailwind or other utility CSS.
+- Database in `supabase/`: Postgres, RLS, Auth, Realtime. Edge Functions live only in `supabase/functions/`.
+- `api/` is reserved for a future FastAPI service. Do not add code there.
+- Do not commit secrets, service-role keys, or the local demo password as if it were safe for production. `VITE_` variables are public.
+- Folder map: `web/`, `supabase/`, `api/`, `docs/`, `.cursor/rules/`, `.github/workflows/`.
