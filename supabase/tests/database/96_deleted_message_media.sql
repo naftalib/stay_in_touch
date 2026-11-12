@@ -84,20 +84,9 @@ select ok(
 
 select test.login('mom@fixture.test');
 set local role authenticated;
-select is(
-  (
-    select unread_count::int
-    from public.unread_counts('b0000000-0000-4000-8000-000000000001')
-    where space_id = 'b3000000-0000-4000-8000-000000000001'
-    limit 1
-  ),
-  (
-    select unread_count::int
-    from public.unread_counts('b0000000-0000-4000-8000-000000000001')
-    where space_id = 'b3000000-0000-4000-8000-000000000001'
-    limit 1
-  ),
-  'unread_counts is unchanged by the visibility rule (sanity)'
+select ok(
+  (select count(*) from public.unread_counts('b0000000-0000-4000-8000-000000000001')) >= 1,
+  'unread_counts still returns rows after media visibility rule change'
 );
 
 select * from finish();

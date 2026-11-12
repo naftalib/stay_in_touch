@@ -52,6 +52,22 @@ This index mirrors the old table so existing links to `docs/decisions.md` still 
 | Local seed password | [0032](./decisions/0032-local-seed-password.md) |
 | Local Realtime policy (`dblink`) | [0033](./decisions/0033-local-realtime-policy-dblink.md) |
 
+## First web screens (handoff 03)
+
+| Topic | ADR |
+|---|---|
+| Routing (React Router 8 declarative) | [0035](./decisions/0035-routing.md) |
+| Server state (TanStack Query) | [0036](./decisions/0036-server-state-tanstack-query.md) |
+| Thread list (no virtualization) | [0037](./decisions/0037-thread-list-no-virtualization.md) |
+| Forms (React Aria) | [0038](./decisions/0038-forms-react-aria.md) |
+| Frontend testing | [0039](./decisions/0039-frontend-testing.md) |
+| Design tokens (CSS variables) | [0040](./decisions/0040-design-tokens-css.md) |
+| Generated DB types | [0041](./decisions/0041-generated-db-types.md) |
+| Deleted message placeholder | [0042](./decisions/0042-deleted-message-placeholder.md) |
+| Media hidden with deleted parent | [0043](./decisions/0043-media-hidden-with-deleted-message.md) |
+| Magic link with code | [0044](./decisions/0044-magic-link-with-code.md) |
+| Realtime subscription scope | [0045](./decisions/0045-realtime-subscription-scope.md) |
+
 ## Future additions
 
 | Topic | ADR |

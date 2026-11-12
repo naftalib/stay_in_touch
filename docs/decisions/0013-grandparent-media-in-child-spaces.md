@@ -3,6 +3,10 @@
 ## Context
 Grandparents participate in children's rooms without their own space.
 
+## Options considered
+- **Chosen:** Messages, photos, and videos in child spaces.
+- **Alternative:** Text messages only in child spaces.
+
 ## Decision
 Grandparents may post photos and videos in a child's space (same as text).
 

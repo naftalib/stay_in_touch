@@ -3,6 +3,9 @@ node_modules/
 dist/
 dist-ssr/
 *.tsbuildinfo
+.vitest/
+web/playwright-report/
+web/test-results/
 
 # Env files. .env.example is the only committed env file.
 .env

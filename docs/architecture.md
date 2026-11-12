@@ -2,12 +2,12 @@
 
 ## Overview
 
-Stay In Touch is a private, invite-only family social app: one family per tenant, spaces for General, each parent, and each child, with grandparents able to visit every space. The repo today is a **monorepo skeleton plus the full database layer**; the web UI, Edge Functions, media upload, email, and push are planned.
+Stay In Touch is a private, invite-only family social app: one family per tenant, spaces for General, each parent, and each child, with grandparents able to visit every space. The repo has the **database layer** and the **first web screens** (sign-in, app shell, message threads); Edge Functions, media upload, email delivery, and push are planned.
 
 ```mermaid
 flowchart LR
   subgraph client["Client (planned PWA)"]
-    Web["Vite + React + TS\nReact Aria, CSS Modules"]
+    Web["Vite + React + TS<br/>React Aria, CSS Modules"]
   end
   subgraph cf["Cloudflare (planned)"]
     Pages["Static / PWA host"]
@@ -24,7 +24,7 @@ flowchart LR
     Push["Web Push / VAPID"]
   end
   subgraph future["Future"]
-    API["FastAPI on Cloud Run\napi/ folder"]
+    API["FastAPI on Cloud Run<br/>api/ folder"]
   end
   Web --> Pages
   Web --> Auth
@@ -40,18 +40,37 @@ flowchart LR
 
 | Folder | Responsibility | Status |
 |---|---|---|
-| `web/` | PWA UI, Supabase client, accessibility-first components | Placeholder page only |
+| `web/` | PWA UI, Supabase client, accessibility-first components | **First screens** (auth, shell, threads) |
 | `supabase/` | Migrations, seed, pgTAP tests, local CLI config | **Implemented** |
 | `supabase/functions/` | Signed URLs, media status, outbox workers | README only |
 | `api/` | Later AI / Python services | README only |
 | `docs/` | Architecture, ADRs, build log, hosted checklist | Living docs |
-| `.github/workflows/` | Web lint/build and database CI | **Implemented** |
+| `.github/workflows/` | Web unit tests, E2E vs local Supabase, database CI | **Implemented** |
 
 For roles, tables, RLS, RPCs, and Realtime behavior, see the sections below. Planning ADRs are in [`docs/decisions/`](./decisions/).
 
+## Web layout (`web/src/`)
+
+| Area | Responsibility |
+|---|---|
+| `app/` | `AppProviders`, `routes.tsx` (React Router 8 declarative) |
+| `auth/` | Session provider, sign-in, callback, `RequireAuth` |
+| `family/` | Families, members, spaces, unread queries |
+| `shell/` | `AppShell`, `SideNav`, `buildNav`, drawer, tabs, connection banner |
+| `spaces/` | Space page, unavailable screen, audience line, placeholder tabs |
+| `messages/` | Thread, composer, cache merge, realtime refetch by id |
+| `unread/` | Badge counts and mark-read hooks (also under `family/` where shared) |
+| `settings/` | Text size control (`data-text-size` on `<html>`) |
+| `ui/` | Thin React Aria wrappers |
+| `lib/` | Typed Supabase singleton, TanStack Query client, query keys, errors |
+| `styles/` | `tokens.css`, `base.css` (logical properties, no Tailwind) |
+| `test/` | Vitest setup; `e2e/` at `web/e2e/` for Playwright |
+
+Server state uses TanStack Query; routing does not use React Router data loaders. Realtime subscribes to private `space:{id}` broadcast topics for every viewable space in the active family and refetches message rows by id under RLS.
+
 ---
 
-Stay In Touch is a private, invite-only family app. One family has a General space plus one space for each parent and child. Grandparents do not get a space. Each space holds photos, videos, and one flat message thread. A message may quote-reply to another message in the same space. There is no UI for this yet. This document is the database and access model the UI will sit on.
+Stay In Touch is a private, invite-only family app. One family has a General space plus one space for each parent and child. Grandparents do not get a space. Each space holds photos, videos, and one flat message thread. A message may quote-reply to another message in the same space.
 
 ## Stack
 

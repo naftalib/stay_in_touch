@@ -19,8 +19,11 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: process.env.CI ? 'pnpm preview' : 'pnpm dev',
+    command: process.env.CI
+      ? 'pnpm preview -- --host 127.0.0.1 --port 5173'
+      : 'pnpm dev -- --host 127.0.0.1 --port 5173',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,
+    cwd: import.meta.dirname,
   },
 })
