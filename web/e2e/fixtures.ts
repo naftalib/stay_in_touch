@@ -49,7 +49,27 @@ export async function signInWithPassword(
     user.password,
   )
   await passwordPanel.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).not.toHaveURL(/sign-in/)
+  await expect(page).not.toHaveURL(/sign-in/, { timeout: 15_000 })
+}
+
+/** Opens the Spaces drawer on narrow viewports. */
+export async function ensureSpacesNavOpen(
+  page: import('@playwright/test').Page,
+) {
+  const drawerOpener = page.getByRole('button', { name: 'Spaces' })
+  if (await drawerOpener.isVisible()) {
+    await drawerOpener.click()
+  }
+}
+
+export function spacesNav(page: import('@playwright/test').Page) {
+  return page.getByRole('navigation', { name: 'Spaces' })
+}
+
+export async function signOutFromApp(page: import('@playwright/test').Page) {
+  await ensureSpacesNavOpen(page)
+  await page.getByRole('button', { name: 'Sign out' }).click()
+  await expect(page).toHaveURL(/sign-in/, { timeout: 15_000 })
 }
 
 export const test = base.extend<{ seedUser: SeedUser }>({

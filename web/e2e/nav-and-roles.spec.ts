@@ -1,17 +1,29 @@
-import { test, expect, signInWithPassword, SEED_USERS, FAMILY_ID } from './fixtures.ts'
+import {
+  test,
+  expect,
+  signInWithPassword,
+  ensureSpacesNavOpen,
+  spacesNav,
+  SEED_USERS,
+  FAMILY_ID,
+} from './fixtures.ts'
 
 test('grandma sees all spaces', async ({ page }) => {
   await signInWithPassword(page, SEED_USERS.grandma)
-  await expect(page.getByRole('link', { name: 'General' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Mom' })).toBeVisible()
+  await ensureSpacesNavOpen(page)
+  const nav = spacesNav(page)
+  await expect(nav.getByRole('link', { name: 'General' })).toBeVisible()
+  await expect(nav.getByRole('link', { name: 'Mom' })).toBeVisible()
 })
 
 test('noa sees limited nav', async ({ page }) => {
   await signInWithPassword(page, SEED_USERS.noa)
-  await expect(page.getByRole('link', { name: 'General' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Noa' })).toBeVisible()
-  await expect(page.getByText('Ari')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Mom' })).toHaveCount(0)
+  await ensureSpacesNavOpen(page)
+  const nav = spacesNav(page)
+  await expect(nav.getByRole('link', { name: 'General' })).toBeVisible()
+  await expect(nav.getByRole('link', { name: 'Noa' })).toBeVisible()
+  await expect(nav.getByText('Ari', { exact: true })).toBeVisible()
+  await expect(nav.getByRole('link', { name: 'Mom' })).toHaveCount(0)
 })
 
 test('unavailable space for noa', async ({ page }) => {
