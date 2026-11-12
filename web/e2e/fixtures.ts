@@ -41,9 +41,14 @@ export async function signInWithPassword(
 ) {
   await page.goto('/sign-in')
   await page.getByRole('tab', { name: 'Sign in with password' }).click()
-  await page.getByLabel('Email').fill(user.email)
-  await page.getByLabel('Password').fill(user.password)
-  await page.getByRole('button', { name: 'Sign in' }).click()
+  const passwordPanel = page.getByRole('tabpanel', {
+    name: 'Sign in with password',
+  })
+  await passwordPanel.getByRole('textbox', { name: 'Email' }).fill(user.email)
+  await passwordPanel.getByRole('textbox', { name: 'Password' }).fill(
+    user.password,
+  )
+  await passwordPanel.getByRole('button', { name: 'Sign in' }).click()
   await expect(page).not.toHaveURL(/sign-in/)
 }
 
