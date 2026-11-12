@@ -21,7 +21,17 @@ test('grandma sees all spaces', async ({ page }) => {
 })
 
 test('noa sees limited nav', async ({ page }) => {
+  const siblingLabelsRpc = page.waitForResponse(
+    (resp) =>
+      resp.request().method() === 'POST' &&
+      resp.url().includes('nav_child_sibling_labels') &&
+      resp.ok(),
+    { timeout: 20_000 },
+  )
   await signInWithPassword(page, SEED_USERS.noa)
+  const rpc = await siblingLabelsRpc
+  const payload = (await rpc.json()) as unknown
+  console.log('nav_child_sibling_labels', JSON.stringify(payload))
   await expect(page.getByText(/can see this space/i)).toBeVisible({
     timeout: 15_000,
   })

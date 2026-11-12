@@ -1,11 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { useAuth } from '../auth/AuthContext.tsx'
 import { getSupabase } from '../lib/supabase.ts'
 import { queryKeys } from '../lib/queryKeys.ts'
 import type { NavSibling } from '../shell/buildNav.ts'
 import type { FamilyRole } from '../lib/database.helpers.ts'
 
-async function fetchChildSiblingLabels(
+export async function fetchChildSiblingLabels(
   familyId: string,
 ): Promise<NavSibling[]> {
   const supabase = getSupabase()
@@ -20,10 +19,10 @@ export function useChildSiblingLabels(
   familyId: string,
   role: FamilyRole,
 ) {
-  const { session } = useAuth()
   return useQuery({
     queryKey: [...queryKeys.members(familyId), 'child-siblings'] as const,
     queryFn: () => fetchChildSiblingLabels(familyId),
-    enabled: Boolean(familyId) && Boolean(session) && role === 'member',
+    enabled: Boolean(familyId) && role === 'member',
+    staleTime: 0,
   })
 }
