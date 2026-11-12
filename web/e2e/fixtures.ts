@@ -59,6 +59,7 @@ export async function ensureSpacesNavOpen(
   const drawerOpener = page.getByRole('button', { name: 'Spaces' })
   if (await drawerOpener.isVisible()) {
     await drawerOpener.click()
+    await expect(page.getByRole('dialog')).toBeVisible()
     await expect(spacesNav(page)).toBeVisible()
   }
 }

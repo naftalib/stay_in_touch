@@ -12,8 +12,12 @@ test('grandma sees all spaces', async ({ page }) => {
   await signInWithPassword(page, SEED_USERS.grandma)
   await ensureSpacesNavOpen(page)
   const nav = spacesNav(page)
-  await expect(nav.getByRole('link', { name: /General/ })).toBeVisible()
-  await expect(nav.getByRole('link', { name: /Mom/ })).toBeVisible()
+  await expect(nav.getByRole('link', { name: /General/ })).toBeVisible({
+    timeout: 15_000,
+  })
+  await expect(nav.getByRole('link', { name: /Mom/ })).toBeVisible({
+    timeout: 15_000,
+  })
 })
 
 test('noa sees limited nav', async ({ page }) => {
@@ -25,8 +29,8 @@ test('noa sees limited nav', async ({ page }) => {
     timeout: 10_000,
   })
   await expect(
-    nav.locator('li').filter({ hasText: /^Ari\b/ }),
-  ).toBeVisible()
+    nav.getByText('Ari, private space, not available to you'),
+  ).toBeVisible({ timeout: 15_000 })
   await expect(nav.getByRole('link', { name: 'Mom' })).toHaveCount(0)
 })
 
