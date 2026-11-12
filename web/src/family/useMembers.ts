@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useAuth } from '../auth/AuthContext.tsx'
 import { getSupabase } from '../lib/supabase.ts'
 import { queryKeys } from '../lib/queryKeys.ts'
 import type { FamilyMember } from '../lib/database.helpers.ts'
@@ -17,9 +18,10 @@ async function fetchMembers(familyId: string): Promise<FamilyMember[]> {
 }
 
 export function useMembers(familyId: string) {
+  const { session } = useAuth()
   return useQuery({
     queryKey: queryKeys.members(familyId),
     queryFn: () => fetchMembers(familyId),
-    enabled: Boolean(familyId),
+    enabled: Boolean(familyId) && Boolean(session),
   })
 }

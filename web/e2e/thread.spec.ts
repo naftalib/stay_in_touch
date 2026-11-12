@@ -6,6 +6,7 @@ test('post a message in general', async ({ page }) => {
   const composer = page.getByRole('main').getByRole('textbox', {
     name: 'Message',
   })
+  await expect(composer).toBeVisible({ timeout: 15_000 })
   await composer.fill(body)
   await page.getByRole('main').getByRole('button', { name: 'Send' }).click()
   await expect(

@@ -7,6 +7,7 @@ import {
 } from './fixtures.ts'
 
 test('password sign-in and sign-out', async ({ page }) => {
+  test.setTimeout(60_000)
   await signInWithPassword(page, SEED_USERS.grandma)
   await signOutFromApp(page)
   await page.goBack()

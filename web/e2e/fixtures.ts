@@ -50,6 +50,7 @@ export async function signInWithPassword(
   )
   await passwordPanel.getByRole('button', { name: 'Sign in' }).click()
   await expect(page).not.toHaveURL(/sign-in/, { timeout: 15_000 })
+  await expect(page).toHaveURL(/\/f\//, { timeout: 15_000 })
 }
 
 /** Opens the Spaces drawer on narrow viewports. */
@@ -59,18 +60,30 @@ export async function ensureSpacesNavOpen(
   const drawerOpener = page.getByRole('button', { name: 'Spaces' })
   if (await drawerOpener.isVisible()) {
     await drawerOpener.click()
-    await expect(page.getByRole('dialog')).toBeVisible()
-    await expect(spacesNav(page)).toBeVisible()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    const nav = dialog.getByRole('navigation', { name: 'Spaces' })
+    await expect(nav).toBeVisible()
+    await expect(nav.getByRole('link').first()).toBeVisible({ timeout: 15_000 })
   }
 }
 
 export function spacesNav(page: import('@playwright/test').Page) {
-  return page.getByRole('navigation', { name: 'Spaces' })
+  return page
+    .locator('aside, [role="dialog"]')
+    .getByRole('navigation', { name: 'Spaces' })
+}
+
+/** Side nav shell (footer with sign-out) for the current viewport. */
+export function spacesShell(page: import('@playwright/test').Page) {
+  return page.locator('aside, [role="dialog"]')
 }
 
 export async function signOutFromApp(page: import('@playwright/test').Page) {
   await ensureSpacesNavOpen(page)
-  await page.getByRole('button', { name: 'Sign out' }).click()
+  const signOut = spacesShell(page).getByRole('button', { name: 'Sign out' })
+  await signOut.scrollIntoViewIfNeeded()
+  await signOut.click({ timeout: 15_000 })
   await expect(page).toHaveURL(/sign-in/, { timeout: 15_000 })
 }
 
