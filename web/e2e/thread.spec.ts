@@ -8,5 +8,5 @@ test('post a message in general', async ({ page }) => {
   })
   await composer.fill(body)
   await page.getByRole('main').getByRole('button', { name: 'Send' }).click()
-  await expect(page.getByText(body)).toBeVisible()
+  await expect(page.getByRole('main').getByText(body, { exact: true })).toBeVisible()
 })

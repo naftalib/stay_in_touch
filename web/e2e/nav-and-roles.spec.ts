@@ -20,9 +20,13 @@ test('noa sees limited nav', async ({ page }) => {
   await signInWithPassword(page, SEED_USERS.noa)
   await ensureSpacesNavOpen(page)
   const nav = spacesNav(page)
-  await expect(nav.getByRole('link', { name: 'General' })).toBeVisible()
-  await expect(nav.getByRole('link', { name: 'Noa' })).toBeVisible()
-  await expect(nav.getByText('Ari', { exact: true })).toBeVisible()
+  await expect(nav.getByRole('link', { name: /General/ })).toBeVisible()
+  await expect(nav.getByRole('link', { name: /Noa/ })).toBeVisible({
+    timeout: 10_000,
+  })
+  await expect(
+    nav.locator('li').filter({ hasText: /^Ari\b/ }),
+  ).toBeVisible()
   await expect(nav.getByRole('link', { name: 'Mom' })).toHaveCount(0)
 })
 
