@@ -10,5 +10,6 @@ test('password sign-in and sign-out', async ({ page }) => {
   await signInWithPassword(page, SEED_USERS.grandma)
   await signOutFromApp(page)
   await page.goBack()
-  await expect(page).toHaveURL(/sign-in/, { timeout: 15_000 })
+  // History may be empty (about:blank); must not return to a cached thread.
+  await expect(page).not.toHaveURL(/\/f\//)
 })

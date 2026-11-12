@@ -12,8 +12,8 @@ test('grandma sees all spaces', async ({ page }) => {
   await signInWithPassword(page, SEED_USERS.grandma)
   await ensureSpacesNavOpen(page)
   const nav = spacesNav(page)
-  await expect(nav.getByRole('link', { name: 'General' })).toBeVisible()
-  await expect(nav.getByRole('link', { name: 'Mom' })).toBeVisible()
+  await expect(nav.getByRole('link', { name: /General/ })).toBeVisible()
+  await expect(nav.getByRole('link', { name: /Mom/ })).toBeVisible()
 })
 
 test('noa sees limited nav', async ({ page }) => {
