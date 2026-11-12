@@ -1,0 +1,7 @@
+---
+description: Keep the decision log current
+globs: docs/**
+alwaysApply: false
+---
+
+When a decision changes, update `docs/decisions.md` in the same change. `docs/architecture.md` should stay aligned with the database and access model.

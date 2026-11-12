@@ -1,0 +1,12 @@
+---
+description: Database change rules
+globs: supabase/**
+alwaysApply: false
+---
+
+Schema changes are new files in `supabase/migrations/`. Do not edit a migration that has already been applied.
+
+- Every new exposed table gets RLS, explicit grants, and pgTAP tests in `supabase/tests/database/`.
+- Access checks go through the `private` helpers. `security definer` only in `private` or a vetted RPC, always with `search_path = ''`.
+- Do not authorize from JWT custom claims. Read `family_members`.
+- Tests create their own fixtures and do not depend on `seed.sql`.

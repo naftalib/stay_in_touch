@@ -1,0 +1,26 @@
+# Dependencies and builds
+node_modules/
+dist/
+dist-ssr/
+*.tsbuildinfo
+
+# Env files. .env.example is the only committed env file.
+.env
+.env.*
+!.env.example
+
+# Supabase local artifacts
+supabase/.temp/
+supabase/.branches/
+
+# Logs and OS files
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/*
+!.vscode/extensions.json
