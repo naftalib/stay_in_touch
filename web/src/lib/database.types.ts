@@ -1,4 +1,5 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
 export type Database = {
   graphql_public: {
     Tables: {
@@ -764,6 +765,7 @@ export type Database = {
     };
   };
 };
+
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
 
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">];
