@@ -9,10 +9,10 @@ import {
 } from 'react-aria-components'
 import { useAuth } from '../auth/AuthContext.tsx'
 import { useFamily } from '../family/FamilyProvider.tsx'
-import { useChildSiblingLabels } from '../family/useChildSiblingLabels.ts'
+import { fetchChildSiblingLabels } from '../family/useChildSiblingLabels.ts'
 import { useSpaces } from '../family/useSpaces.ts'
 import { useUnreadCounts } from '../family/useUnreadCounts.ts'
-import { buildNav, type NavSpace } from './buildNav.ts'
+import { buildNav, type NavSibling, type NavSpace } from './buildNav.ts'
 import SideNav from './SideNav.tsx'
 import SpaceTabs from './SpaceTabs.tsx'
 import ConnectionBanner from './ConnectionBanner.tsx'
@@ -76,8 +76,25 @@ export default function AppShell() {
     [spacesQuery.data, unreadMap],
   )
 
-  const siblingLabelsQuery = useChildSiblingLabels(activeFamilyId, role)
-  const siblings = siblingLabelsQuery.data ?? []
+  const [siblings, setSiblings] = useState<NavSibling[]>([])
+
+  useEffect(() => {
+    if (role !== 'member' || !activeFamilyId) {
+      setSiblings([])
+      return
+    }
+    let cancelled = false
+    void fetchChildSiblingLabels(activeFamilyId)
+      .then((labels) => {
+        if (!cancelled) setSiblings(labels)
+      })
+      .catch(() => {
+        if (!cancelled) setSiblings([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeFamilyId, role])
 
   const navItems = buildNav(role, memberId, navSpaces, siblings)
   const activeSpace = spacesQuery.data?.find((s) => s.id === activeSpaceId)
