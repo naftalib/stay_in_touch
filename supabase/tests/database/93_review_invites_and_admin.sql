@@ -221,7 +221,6 @@ select throws_ok(
   '42501', NULL, 'an admin cannot post in an archived space'
 );
 
--- Known gaps (TODO until fixed).
 reset role;
 update public.family_members set status = 'removed', removed_at = now() where id = 'b2000000-0000-4000-8000-000000000005';
 insert into public.invitations (id, family_id, email, role, label, create_space, invited_by, expires_at)

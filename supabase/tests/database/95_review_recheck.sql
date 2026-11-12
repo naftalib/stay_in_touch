@@ -204,8 +204,6 @@ select is(
   0, 'unread: the caller''s own new message is not unread'
 );
 
--- Open questions (TODO).
-select todo_start('Question: rename_space still writes to an archived space');
 reset role;
 update public.spaces set archived_at = now() where id = 'b3000000-0000-4000-8000-000000000005';
 select test.login('mom@fixture.test');
@@ -214,9 +212,7 @@ select throws_ok(
   $$select public.rename_space('b3000000-0000-4000-8000-000000000005', 'Renamed while archived')$$,
   '42501', NULL, 'rename_space refuses an archived space until it is unarchived'
 );
-select todo_end();
 
-select todo_start('Finding: accept_invite unarchives a space without an audit row');
 reset role;
 update public.family_members set status = 'removed', removed_at = now() where id = 'b2000000-0000-4000-8000-000000000006';
 insert into public.invitations (id, family_id, email, role, label, create_space, invited_by, expires_at)
@@ -239,16 +235,13 @@ select is(
   ),
   1, 'reopening an archived space through accept_invite is audited as space.unarchived'
 );
-select todo_end();
 
-select todo_start('Finding: space_viewer_member_ids answers for spaces outside the caller''s families');
 select test.login('stranger@fixture.test');
 set local role authenticated;
 select is(
   (select count(*)::int from private.space_viewer_member_ids('b3000000-0000-4000-8000-000000000001')),
   0, 'a stranger gets no member ids for another family''s space'
 );
-select todo_end();
 
 select * from finish();
 rollback;
