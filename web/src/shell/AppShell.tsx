@@ -80,10 +80,15 @@ export default function AppShell() {
     [spacesQuery.data, unreadMap],
   )
 
-  const generalSpaceId = useMemo(
-    () => navSpaces.find((space) => space.kind === 'general')?.id,
-    [navSpaces],
-  )
+  const generalSpaceId = useMemo(() => {
+    const listed = navSpaces.find((space) => space.kind === 'general')?.id
+    if (listed) return listed
+    // Before spaces resolve, the thread route already carries General's id.
+    if (navSpaces.length === 0 && matchSpace?.params.tab === 'messages') {
+      return matchSpace.params.spaceId
+    }
+    return undefined
+  }, [matchSpace?.params.spaceId, matchSpace?.params.tab, navSpaces])
 
   const generalAudienceQuery = useSpaceAudience(
     generalSpaceId,
