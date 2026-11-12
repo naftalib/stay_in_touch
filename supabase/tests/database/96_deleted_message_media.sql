@@ -5,7 +5,7 @@ select set_config('search_path', 'public, extensions', true);
 \ir _fixtures.sql.inc
 \ir _review_helpers.sql.inc
 
-select plan(8);
+select plan(6);
 
 reset role;
 insert into public.messages (id, space_id, family_id, author_member_id, body, created_by, created_at)

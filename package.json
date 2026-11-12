@@ -18,5 +18,8 @@
     "db:types": "supabase gen types typescript --local > web/src/lib/database.types.ts && pnpm exec oxfmt web/src/lib/database.types.ts",
     "test": "pnpm --filter web test",
     "test:e2e": "pnpm --filter web test:e2e"
+  },
+  "devDependencies": {
+    "oxfmt": "0.78.0"
   }
 }
