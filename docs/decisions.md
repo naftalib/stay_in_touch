@@ -67,6 +67,7 @@ This index mirrors the old table so existing links to `docs/decisions.md` still 
 | Media hidden with deleted parent | [0043](./decisions/0043-media-hidden-with-deleted-message.md) |
 | Magic link with code | [0044](./decisions/0044-magic-link-with-code.md) |
 | Realtime subscription scope | [0045](./decisions/0045-realtime-subscription-scope.md) |
+| Child nav sibling labels | [0046](./decisions/0046-child-nav-sibling-labels.md) |
 
 ## Future additions
 

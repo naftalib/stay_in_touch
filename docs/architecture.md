@@ -55,18 +55,17 @@ For roles, tables, RLS, RPCs, and Realtime behavior, see the sections below. Pla
 |---|---|
 | `app/` | `AppProviders`, `routes.tsx` (React Router 8 declarative) |
 | `auth/` | Session provider, sign-in, callback, `RequireAuth` |
-| `family/` | Families, members, spaces, unread queries |
+| `family/` | Families, the signed-in membership, spaces, sibling labels, unread counts |
 | `shell/` | `AppShell`, `SideNav`, `buildNav`, drawer, tabs, connection banner |
 | `spaces/` | Space page, unavailable screen, audience line, placeholder tabs |
 | `messages/` | Thread, composer, cache merge, realtime refetch by id |
-| `unread/` | Badge counts and mark-read hooks (also under `family/` where shared) |
 | `settings/` | Text size control (`data-text-size` on `<html>`) |
 | `ui/` | Thin React Aria wrappers |
 | `lib/` | Typed Supabase singleton, TanStack Query client, query keys, errors |
 | `styles/` | `tokens.css`, `base.css` (logical properties, no Tailwind) |
 | `test/` | Vitest setup; `e2e/` at `web/e2e/` for Playwright |
 
-Server state uses TanStack Query; routing does not use React Router data loaders. Realtime subscribes to private `space:{id}` broadcast topics for every viewable space in the active family and refetches message rows by id under RLS.
+Server state uses TanStack Query; routing does not use React Router data loaders. `AppProviders` puts React Aria's `RouterProvider` inside `BrowserRouter` so React Aria links use client navigation. Realtime calls `setAuth` before subscribing to private `space:{id}` broadcast topics for every viewable space in the active family, then refetches message rows by id under RLS. A child nav sibling is a label from `nav_child_sibling_labels`, not a space id. Unread counts and `mark_space_read` live with the family queries.
 
 ---
 

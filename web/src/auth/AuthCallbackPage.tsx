@@ -1,85 +1,55 @@
-import { useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
-import { getSupabase } from '../lib/supabase.ts'
-import { mapError, type AppError } from '../lib/errors.ts'
-import { useAuth } from './AuthContext.tsx'
-import styles from './AuthCallbackPage.module.css'
+import { useEffect, useState } from "react";
+import { Link, Navigate } from "react-router";
+import { useAuth } from "./AuthContext.tsx";
+import styles from "./AuthCallbackPage.module.css";
+
+const EXPIRED =
+  "This link has expired or was already used. Enter the 6-digit code from the email, or ask for a new link.";
+
+function linkError(): string | null {
+  const search = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const description = search.get("error_description") || hash.get("error_description");
+  if (search.get("error") || hash.get("error") || description) return EXPIRED;
+  return null;
+}
 
 export default function AuthCallbackPage() {
-  const { session } = useAuth()
-  const navigate = useNavigate()
-  const [error, setError] = useState<AppError | null>(null)
-  const [working, setWorking] = useState(true)
+  const { session } = useAuth();
+  const immediateError = linkError();
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
-    if (session) {
-      setWorking(false)
-      return
-    }
-
-    let cancelled = false
-
-    async function finishAuth() {
-      try {
-        const supabase = getSupabase()
-        const params = new URLSearchParams(window.location.search)
-        const code = params.get('code')
-
-        if (code) {
-          const { error: exchangeError } =
-            await supabase.auth.exchangeCodeForSession(code)
-          if (exchangeError) {
-            if (!cancelled) setError(mapError(exchangeError))
-            return
-          }
-        } else {
-          const { error: sessionError } = await supabase.auth.getSession()
-          if (sessionError) {
-            if (!cancelled) setError(mapError(sessionError))
-            return
-          }
-        }
-
-        if (!cancelled) {
-          navigate('/', { replace: true })
-        }
-      } catch (caught) {
-        if (!cancelled) setError(mapError(caught))
-      } finally {
-        if (!cancelled) setWorking(false)
-      }
-    }
-
-    void finishAuth()
-
-    return () => {
-      cancelled = true
-    }
-  }, [navigate, session])
+    if (immediateError) return;
+    const timer = window.setTimeout(() => {
+      setTimedOut(true);
+    }, 8000);
+    return () => window.clearTimeout(timer);
+  }, [immediateError]);
 
   if (session) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/" replace />;
   }
+
+  const error = immediateError ?? (timedOut ? EXPIRED : null);
 
   return (
     <main className={styles.page}>
       <div className={styles.card}>
         <h1 className={styles.title}>Signing you in</h1>
-        {working && !error ? (
-          <p role="status">One moment…</p>
-        ) : null}
         {error ? (
           <>
             <p className={styles.error} role="alert">
-              <strong>{error.title}</strong>
-              {error.detail ? ` ${error.detail}` : null}
+              {error}
             </p>
             <Link className={styles.link} to="/sign-in">
               Back to sign-in
             </Link>
           </>
-        ) : null}
+        ) : (
+          <p role="status">Signing you in...</p>
+        )}
       </div>
     </main>
-  )
+  );
 }

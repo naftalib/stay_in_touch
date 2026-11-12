@@ -1,23 +1,17 @@
-import { Navigate, Outlet, useLocation } from 'react-router'
-import { useAuth } from './AuthContext.tsx'
-
-function safeReturnPath(pathname: string): { pathname: string } {
-  if (!pathname.startsWith('/') || pathname.startsWith('//')) {
-    return { pathname: '/' }
-  }
-  return { pathname }
-}
+import { Navigate, Outlet, useLocation } from "react-router";
+import { useAuth } from "./AuthContext.tsx";
+import { safeReturnPath } from "./safeReturnPath.ts";
 
 export default function RequireAuth() {
-  const { session, loading } = useAuth()
-  const location = useLocation()
+  const { session, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
       <div role="status" aria-live="polite" className="sr-only">
         Checking sign-in…
       </div>
-    )
+    );
   }
 
   if (!session) {
@@ -25,10 +19,10 @@ export default function RequireAuth() {
       <Navigate
         to="/sign-in"
         replace
-        state={{ from: safeReturnPath(location.pathname) }}
+        state={{ from: { pathname: safeReturnPath(location.pathname) } }}
       />
-    )
+    );
   }
 
-  return <Outlet />
+  return <Outlet />;
 }

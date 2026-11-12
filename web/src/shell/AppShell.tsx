@@ -1,66 +1,54 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, Outlet, useMatch, useParams } from 'react-router'
-import {
-  Button,
-  Dialog,
-  DialogTrigger,
-  Modal,
-  ModalOverlay,
-} from 'react-aria-components'
-import { useAuth } from '../auth/AuthContext.tsx'
-import { useFamily } from '../family/FamilyProvider.tsx'
-import { fetchChildSiblingLabels } from '../family/useChildSiblingLabels.ts'
-import { useSpaces } from '../family/useSpaces.ts'
-import { useUnreadCounts } from '../family/useUnreadCounts.ts'
-import { buildNav, type NavSibling, type NavSpace } from './buildNav.ts'
-import SideNav from './SideNav.tsx'
-import SpaceTabs from './SpaceTabs.tsx'
-import ConnectionBanner from './ConnectionBanner.tsx'
-import { useOnlineStatus } from './useOnlineStatus.ts'
-import { useRealtimeConnection } from './useRealtimeConnection.ts'
-import styles from './AppShell.module.css'
+import { useEffect, useMemo, useState } from "react";
+import { Link, Outlet, useMatch, useParams } from "react-router";
+import { Button, Dialog, DialogTrigger, Modal, ModalOverlay } from "react-aria-components";
+import { useAuth } from "../auth/AuthContext.tsx";
+import { useFamily } from "../family/FamilyProvider.tsx";
+import { useChildSiblingLabels } from "../family/useChildSiblingLabels.ts";
+import { useSpaces } from "../family/useSpaces.ts";
+import { useUnreadCounts } from "../family/useUnreadCounts.ts";
+import { buildNav, type NavSpace } from "./buildNav.ts";
+import SideNav from "./SideNav.tsx";
+import SpaceTabs from "./SpaceTabs.tsx";
+import ConnectionBanner from "./ConnectionBanner.tsx";
+import { useOnlineStatus } from "./useOnlineStatus.ts";
+import { useRealtimeConnection } from "./useRealtimeConnection.ts";
+import styles from "./AppShell.module.css";
 
-const DRAWER_BREAKPOINT = 900
+const DRAWER_BREAKPOINT = 900;
 
 export default function AppShell() {
   const { familyId, spaceId } = useParams<{
-    familyId: string
-    spaceId?: string
-  }>()
-  const matchSpace = useMatch('/f/:familyId/s/:spaceId/:tab')
-  const activeSpaceId = matchSpace?.params.spaceId ?? spaceId
+    familyId: string;
+    spaceId?: string;
+  }>();
+  const matchSpace = useMatch("/f/:familyId/s/:spaceId/:tab");
+  const activeSpaceId = matchSpace?.params.spaceId ?? spaceId;
 
-  const { membership, role, memberId } = useFamily()
-  const { signOut, displayName } = useAuth()
-  const activeFamilyId = familyId ?? membership.family_id
-  const spacesQuery = useSpaces(activeFamilyId)
-  const unreadQuery = useUnreadCounts(activeFamilyId)
-  const { offline } = useOnlineStatus()
-  const { paused } = useRealtimeConnection()
+  const { membership, role, memberId } = useFamily();
+  const { signOut, displayName } = useAuth();
+  const activeFamilyId = familyId ?? membership.family_id;
+  const spacesQuery = useSpaces(activeFamilyId);
+  const unreadQuery = useUnreadCounts(activeFamilyId);
+  const { offline } = useOnlineStatus();
+  const { paused } = useRealtimeConnection();
 
   const [narrow, setNarrow] = useState(
     () =>
-      typeof window !== 'undefined' &&
+      typeof window !== "undefined" &&
       window.matchMedia(`(max-width: ${DRAWER_BREAKPOINT}px)`).matches,
-  )
+  );
 
   useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${DRAWER_BREAKPOINT}px)`)
-    const onChange = () => setNarrow(mq.matches)
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [])
+    const mq = window.matchMedia(`(max-width: ${DRAWER_BREAKPOINT}px)`);
+    const onChange = () => setNarrow(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   const unreadMap = useMemo(
-    () =>
-      new Map(
-        (unreadQuery.data ?? []).map((row) => [
-          row.space_id,
-          Number(row.unread_count),
-        ]),
-      ),
+    () => new Map((unreadQuery.data ?? []).map((row) => [row.space_id, Number(row.unread_count)])),
     [unreadQuery.data],
-  )
+  );
 
   const navSpaces: NavSpace[] = useMemo(
     () =>
@@ -74,49 +62,25 @@ export default function AppShell() {
         ownerMemberId: space.owner_member_id,
       })),
     [spacesQuery.data, unreadMap],
-  )
+  );
 
-  const [siblings, setSiblings] = useState<NavSibling[]>([])
-
-  useEffect(() => {
-    if (role !== 'member' || !activeFamilyId) {
-      setSiblings([])
-      return
-    }
-    let cancelled = false
-    void fetchChildSiblingLabels(activeFamilyId)
-      .then((labels) => {
-        if (!cancelled) setSiblings(labels)
-      })
-      .catch(() => {
-        if (!cancelled) setSiblings([])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [activeFamilyId, role])
-
-  const navItems = buildNav(role, memberId, navSpaces, siblings)
-  const activeSpace = spacesQuery.data?.find((s) => s.id === activeSpaceId)
+  const siblingsQuery = useChildSiblingLabels(activeFamilyId, role);
+  const navItems = buildNav(role, memberId, navSpaces, siblingsQuery.data ?? []);
+  const activeSpace = spacesQuery.data?.find((s) => s.id === activeSpaceId);
 
   const totalUnread = useMemo(
-    () =>
-      (unreadQuery.data ?? []).reduce(
-        (sum, row) => sum + Number(row.unread_count),
-        0,
-      ),
+    () => (unreadQuery.data ?? []).reduce((sum, row) => sum + Number(row.unread_count), 0),
     [unreadQuery.data],
-  )
+  );
 
   useEffect(() => {
-    const base = 'Stay In Touch'
-    document.title =
-      totalUnread > 0 ? `(${totalUnread}) ${base}` : base
-  }, [totalUnread])
+    const base = "Stay In Touch";
+    document.title = totalUnread > 0 ? `(${totalUnread}) ${base}` : base;
+  }, [totalUnread]);
 
   const handleSignOut = () => {
-    void signOut()
-  }
+    void signOut();
+  };
 
   return (
     <div className={styles.root}>
@@ -153,10 +117,7 @@ export default function AppShell() {
               </ModalOverlay>
             </DialogTrigger>
           ) : null}
-          <FamilyBrandLink
-            familyId={activeFamilyId}
-            name={membership.family.name}
-          />
+          <FamilyBrandLink familyId={activeFamilyId} name={membership.family.name} />
         </div>
         {activeSpaceId && activeSpace ? (
           <SpaceTabs familyId={activeFamilyId} spaceId={activeSpaceId} />
@@ -183,21 +144,15 @@ export default function AppShell() {
         </main>
       </div>
     </div>
-  )
+  );
 }
 
-function FamilyBrandLink({
-  familyId,
-  name,
-}: {
-  familyId: string
-  name: string
-}) {
+function FamilyBrandLink({ familyId, name }: { familyId: string; name: string }) {
   return (
     <div className={styles.brand}>
       <Link to={`/f/${familyId}`} className={styles.brandLink}>
         {name}
       </Link>
     </div>
-  )
+  );
 }
