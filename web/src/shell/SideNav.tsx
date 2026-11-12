@@ -28,7 +28,11 @@ export default function SideNav({
           {items.map((item, index) => {
             if (item.type === 'sibling') {
               return (
-                <li key={`sibling-${item.label}-${index}`} className={styles.sibling}>
+                <li
+                  key={`sibling-${item.label}-${index}`}
+                  className={styles.sibling}
+                  data-testid={`nav-sibling-${item.label}`}
+                >
                   <span className={styles.siblingName}>{item.label}</span>
                   <span className={styles.siblingHint} aria-hidden="true">
                     {item.hint}

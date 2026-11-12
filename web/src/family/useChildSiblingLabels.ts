@@ -8,11 +8,24 @@ export async function fetchChildSiblingLabels(
   familyId: string,
 ): Promise<NavSibling[]> {
   const supabase = getSupabase()
-  const { data, error } = await supabase.rpc('nav_child_sibling_labels', {
-    p_family_id: familyId,
-  })
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const { data, error } = await supabase
+    .from('family_members')
+    .select('label, role, user_id')
+    .eq('family_id', familyId)
+    .eq('status', 'active')
+    .eq('role', 'member')
+
   if (error) throw error
-  return (data ?? []).map((row) => ({ label: row.label }))
+
+  return (data ?? [])
+    .filter((row) => row.user_id !== user.id)
+    .map((row) => ({ label: row.label }))
+    .sort((a, b) => a.label.localeCompare(b.label))
 }
 
 export function useChildSiblingLabels(

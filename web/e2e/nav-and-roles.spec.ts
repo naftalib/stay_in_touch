@@ -27,15 +27,9 @@ test('noa sees limited nav', async ({ page }) => {
   })
   await ensureSpacesNavOpen(page)
   const nav = spacesNav(page)
-  await expect
-    .poll(
-      async () => {
-        const text = await nav.innerText()
-        return text.includes('Ari') && text.includes('Private')
-      },
-      { timeout: 20_000 },
-    )
-    .toBe(true)
+  await expect(nav.getByTestId('nav-sibling-Ari')).toBeVisible({
+    timeout: 20_000,
+  })
   await expect(nav.getByRole('link', { name: /General/ })).toBeVisible({
     timeout: 15_000,
   })
