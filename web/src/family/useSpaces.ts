@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { getSupabase } from '../lib/supabase.ts'
+import { queryKeys } from '../lib/queryKeys.ts'
 import type { Space } from '../lib/database.types.ts'
 
 async function fetchSpaces(familyId: string): Promise<Space[]> {
@@ -16,7 +17,7 @@ async function fetchSpaces(familyId: string): Promise<Space[]> {
 
 export function useSpaces(familyId: string) {
   return useQuery({
-    queryKey: ['spaces', familyId],
+    queryKey: queryKeys.spaces(familyId),
     queryFn: () => fetchSpaces(familyId),
     enabled: Boolean(familyId),
   })

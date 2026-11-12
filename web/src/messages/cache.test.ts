@@ -2,7 +2,9 @@ import { QueryClient } from '@tanstack/react-query'
 import { describe, expect, it } from 'vitest'
 import {
   messagesQueryKey,
+  removeMessage,
   removeMessageFromCache,
+  upsertMessage,
   upsertMessageInCache,
 } from './cache.ts'
 import type { MessagesPage, ThreadMessage } from './types.ts'
@@ -65,5 +67,23 @@ describe('message cache helpers', () => {
       messagesQueryKey(spaceId),
     )
     expect(data?.pages[0].items.map((m) => m.id)).toEqual(['b'])
+  })
+
+  it('orders ties by id in pure upsert', () => {
+    const pages: MessagesPage[] = [
+      {
+        items: [
+          sampleMessage('a', '2020-01-01T00:00:00Z'),
+          sampleMessage('b', '2020-01-01T00:00:00Z'),
+        ],
+        nextCursor: null,
+      },
+    ]
+    const next = upsertMessage(pages, {
+      ...sampleMessage('c', '2020-01-01T00:00:00Z'),
+    })
+    expect(next[0].items.map((m) => m.id)).toEqual(['a', 'b', 'c'])
+    const removed = removeMessage(next, 'b')
+    expect(removed[0].items.map((m) => m.id)).toEqual(['a', 'c'])
   })
 })

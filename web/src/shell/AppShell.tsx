@@ -1,111 +1,193 @@
-import { Link, NavLink, Outlet, useParams } from 'react-router'
-import { Button } from 'react-aria-components'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, Outlet, useMatch, useParams } from 'react-router'
+import {
+  Button,
+  Dialog,
+  DialogTrigger,
+  Modal,
+  ModalOverlay,
+} from 'react-aria-components'
 import { useAuth } from '../auth/AuthContext.tsx'
 import { useFamily } from '../family/FamilyProvider.tsx'
+import { useMembers } from '../family/useMembers.ts'
 import { useSpaces } from '../family/useSpaces.ts'
 import { useUnreadCounts } from '../family/useUnreadCounts.ts'
-import { buildNav, type NavSpace } from './buildNav.ts'
+import {
+  buildNav,
+  siblingLabelsForChild,
+  type NavSpace,
+} from './buildNav.ts'
+import SideNav from './SideNav.tsx'
+import SpaceTabs from './SpaceTabs.tsx'
+import ConnectionBanner from './ConnectionBanner.tsx'
+import { useOnlineStatus } from './useOnlineStatus.ts'
+import { useRealtimeConnection } from './useRealtimeConnection.ts'
 import styles from './AppShell.module.css'
+
+const DRAWER_BREAKPOINT = 900
 
 export default function AppShell() {
   const { familyId, spaceId } = useParams<{
     familyId: string
     spaceId?: string
   }>()
-  const { role, membership } = useFamily()
-  const { signOut } = useAuth()
-  const spacesQuery = useSpaces(familyId ?? membership.family_id)
-  const unreadQuery = useUnreadCounts(familyId ?? membership.family_id)
+  const matchSpace = useMatch('/f/:familyId/s/:spaceId/:tab')
+  const activeSpaceId = matchSpace?.params.spaceId ?? spaceId
 
-  const unreadMap = new Map(
-    (unreadQuery.data ?? []).map((row) => [
-      row.space_id,
-      Number(row.unread_count),
-    ]),
+  const { membership, role, memberId } = useFamily()
+  const { signOut, displayName } = useAuth()
+  const spacesQuery = useSpaces(familyId ?? membership.family_id)
+  const membersQuery = useMembers(familyId ?? membership.family_id)
+  const unreadQuery = useUnreadCounts(familyId ?? membership.family_id)
+  const { offline } = useOnlineStatus()
+  const { paused } = useRealtimeConnection()
+
+  const [narrow, setNarrow] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia(`(max-width: ${DRAWER_BREAKPOINT}px)`).matches,
   )
 
-  const navSpaces: NavSpace[] = (spacesQuery.data ?? []).map((space) => ({
-    id: space.id,
-    title: space.title,
-    kind: space.kind,
-    sortOrder: space.sort_order,
-    archivedAt: space.archived_at,
-    unreadCount: unreadMap.get(space.id) ?? 0,
-  }))
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${DRAWER_BREAKPOINT}px)`)
+    const onChange = () => setNarrow(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
 
-  const navItems = buildNav(role, navSpaces)
+  const unreadMap = useMemo(
+    () =>
+      new Map(
+        (unreadQuery.data ?? []).map((row) => [
+          row.space_id,
+          Number(row.unread_count),
+        ]),
+      ),
+    [unreadQuery.data],
+  )
+
+  const navSpaces: NavSpace[] = useMemo(
+    () =>
+      (spacesQuery.data ?? []).map((space) => ({
+        id: space.id,
+        title: space.title,
+        kind: space.kind,
+        sortOrder: space.sort_order,
+        archivedAt: space.archived_at,
+        unreadCount: unreadMap.get(space.id) ?? 0,
+        ownerMemberId: space.owner_member_id,
+      })),
+    [spacesQuery.data, unreadMap],
+  )
+
+  const siblings = useMemo(() => {
+    if (role !== 'member' || !membersQuery.data) return []
+    return siblingLabelsForChild(memberId, membersQuery.data)
+  }, [memberId, membersQuery.data, role])
+
+  const navItems = buildNav(role, memberId, navSpaces, siblings)
   const activeFamilyId = familyId ?? membership.family_id
+  const activeSpace = spacesQuery.data?.find((s) => s.id === activeSpaceId)
+
+  const totalUnread = useMemo(
+    () =>
+      (unreadQuery.data ?? []).reduce(
+        (sum, row) => sum + Number(row.unread_count),
+        0,
+      ),
+    [unreadQuery.data],
+  )
+
+  useEffect(() => {
+    const base = 'Stay In Touch'
+    document.title =
+      totalUnread > 0 ? `(${totalUnread}) ${base}` : base
+  }, [totalUnread])
+
+  const handleSignOut = () => {
+    void signOut()
+  }
 
   return (
     <div className={styles.root}>
+      <a className={styles.skip} href="#main-content">
+        Skip to main content
+      </a>
+
       <header className={styles.header}>
-        <div className={styles.brand}>
-          <Link to={`/f/${activeFamilyId}`} className={styles.brandLink}>
-            {membership.family.name}
-          </Link>
-          <span className={styles.role}>{membership.label}</span>
+        <div className={styles.headerStart}>
+          {narrow ? (
+            <DialogTrigger>
+              <Button className={styles.spacesButton}>Spaces</Button>
+              <ModalOverlay className={styles.drawerOverlay} isDismissable>
+                <Modal className={styles.drawerModal}>
+                  <Dialog className={styles.drawerDialog}>
+                    {({ close }) => (
+                      <>
+                        <header className={styles.drawerHeader}>
+                          <h2>Spaces</h2>
+                          <Button onPress={close}>Close</Button>
+                        </header>
+                        <SideNav
+                          items={navItems}
+                          familyId={activeFamilyId}
+                          activeSpaceId={activeSpaceId}
+                          onNavigate={close}
+                          onSignOut={handleSignOut}
+                          userLabel={displayName}
+                        />
+                      </>
+                    )}
+                  </Dialog>
+                </Modal>
+              </ModalOverlay>
+            </DialogTrigger>
+          ) : null}
+          <FamilyBrandLink
+            familyId={activeFamilyId}
+            name={membership.family.name}
+          />
         </div>
-        <Button className={styles.signOut} onPress={() => void signOut()}>
-          Sign out
-        </Button>
+        {activeSpaceId && activeSpace ? (
+          <SpaceTabs familyId={activeFamilyId} spaceId={activeSpaceId} />
+        ) : null}
       </header>
 
-      <div className={styles.body}>
-        <nav className={styles.nav} aria-label="Spaces">
-          <ul className={styles.navList}>
-            {navItems.map((item) => {
-              if (item.type === 'space') {
-                const to = `/f/${activeFamilyId}/spaces/${item.spaceId}`
-                const isActive = spaceId === item.spaceId
-                return (
-                  <li key={item.spaceId}>
-                    <NavLink
-                      to={to}
-                      className={({ isActive: active }) =>
-                        [
-                          styles.navLink,
-                          (active || isActive) && styles.navLinkActive,
-                          item.archived && styles.navLinkArchived,
-                        ]
-                          .filter(Boolean)
-                          .join(' ')
-                      }
-                      end
-                    >
-                      <span>{item.label}</span>
-                      {item.unreadCount > 0 ? (
-                        <span className={styles.badge} aria-label={`${item.unreadCount} unread`}>
-                          {item.unreadCount}
-                        </span>
-                      ) : null}
-                    </NavLink>
-                  </li>
-                )
-              }
+      <ConnectionBanner offline={offline} paused={paused && !offline} />
 
-              const to = `/f/${activeFamilyId}/${item.to}`
-              return (
-                <li key={item.to}>
-                  <NavLink
-                    to={to}
-                    className={({ isActive }) =>
-                      [styles.navLink, isActive && styles.navLinkActive]
-                        .filter(Boolean)
-                        .join(' ')
-                    }
-                  >
-                    {item.label}
-                  </NavLink>
-                </li>
-              )
-            })}
-          </ul>
-        </nav>
+      <div className={styles.body}>
+        {!narrow ? (
+          <aside className={styles.aside}>
+            <SideNav
+              items={navItems}
+              familyId={activeFamilyId}
+              activeSpaceId={activeSpaceId}
+              onSignOut={handleSignOut}
+              userLabel={displayName}
+            />
+          </aside>
+        ) : null}
 
         <main className={styles.main} id="main-content">
           <Outlet />
         </main>
       </div>
+    </div>
+  )
+}
+
+function FamilyBrandLink({
+  familyId,
+  name,
+}: {
+  familyId: string
+  name: string
+}) {
+  return (
+    <div className={styles.brand}>
+      <Link to={`/f/${familyId}`} className={styles.brandLink}>
+        {name}
+      </Link>
     </div>
   )
 }

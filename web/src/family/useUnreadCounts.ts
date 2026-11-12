@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { getSupabase } from '../lib/supabase.ts'
+import { queryKeys } from '../lib/queryKeys.ts'
 
 export type UnreadCountRow = { space_id: string; unread_count: number }
 
@@ -15,7 +16,7 @@ async function fetchUnreadCounts(familyId: string): Promise<UnreadCountRow[]> {
 
 export function useUnreadCounts(familyId: string) {
   return useQuery({
-    queryKey: ['unread', familyId],
+    queryKey: queryKeys.unread(familyId),
     queryFn: () => fetchUnreadCounts(familyId),
     enabled: Boolean(familyId),
     refetchInterval: 60_000,

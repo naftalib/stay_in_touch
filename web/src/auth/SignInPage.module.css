@@ -99,3 +99,54 @@
   font-size: 0.9em;
   color: var(--color-text-muted);
 }
+
+.tabList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-end: var(--space-4);
+}
+
+.tab {
+  min-block-size: var(--size-touch-min);
+  padding-inline: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  cursor: pointer;
+}
+
+.tab[data-selected] {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  font-weight: 600;
+}
+
+.tabPanel {
+  margin-block-end: var(--space-4);
+}
+
+.passwordRow {
+  display: flex;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+
+.passwordRow .input {
+  flex: 1;
+}
+
+.togglePassword {
+  min-block-size: var(--size-touch-min);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  cursor: pointer;
+}
+
+.notice {
+  padding: var(--space-3);
+  margin-block-end: var(--space-4);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}

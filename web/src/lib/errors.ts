@@ -54,8 +54,13 @@ export function mapError(error: unknown): AppError {
   if (isPostgrestError(error)) {
     if (error.code === '42501' || error.message.includes('permission')) {
       return {
-        title: 'Not allowed',
-        detail: 'You may not have access to this anymore.',
+        title: "You don't have permission to do that.",
+        code: error.code,
+      }
+    }
+    if (error.code === '22023') {
+      return {
+        title: error.message || "That didn't look right.",
         code: error.code,
       }
     }
@@ -89,11 +94,11 @@ export function mapError(error: unknown): AppError {
       }
     }
     return {
-      title: 'Something went wrong',
+      title: 'Something went wrong. Please try again.',
       detail: error.message,
       retryable: true,
     }
   }
 
-  return { title: 'Something went wrong', retryable: true }
+  return { title: 'Something went wrong. Please try again.', retryable: true }
 }

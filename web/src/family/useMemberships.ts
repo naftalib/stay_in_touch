@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { getSupabase } from '../lib/supabase.ts'
+import { queryKeys } from '../lib/queryKeys.ts'
 import type { ActiveMembership } from './types.ts'
 
 async function fetchMemberships(): Promise<ActiveMembership[]> {
@@ -31,7 +32,7 @@ async function fetchMemberships(): Promise<ActiveMembership[]> {
 
 export function useMemberships() {
   return useQuery({
-    queryKey: ['memberships'],
+    queryKey: queryKeys.memberships(),
     queryFn: fetchMemberships,
   })
 }

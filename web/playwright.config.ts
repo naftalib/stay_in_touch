@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env.CI ? 1 : 0,
   reporter: [['list']],
   use: {
     baseURL: 'http://127.0.0.1:5173',
@@ -15,14 +15,12 @@ export default defineConfig({
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
     {
       name: 'mobile',
-      use: { ...devices['Pixel 7'] },
+      use: { ...devices['iPhone 13'] },
     },
   ],
-  webServer: process.env.CI
-    ? undefined
-    : {
-        command: 'pnpm dev',
-        url: 'http://127.0.0.1:5173',
-        reuseExistingServer: true,
-      },
+  webServer: {
+    command: process.env.CI ? 'pnpm preview' : 'pnpm dev',
+    url: 'http://127.0.0.1:5173',
+    reuseExistingServer: !process.env.CI,
+  },
 })

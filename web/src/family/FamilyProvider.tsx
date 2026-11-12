@@ -5,6 +5,7 @@ import {
   type ReactNode,
 } from 'react'
 import { Navigate, Outlet, useParams } from 'react-router'
+import { isUuid } from '../lib/uuid.ts'
 import { useMemberships } from './useMemberships.ts'
 import type { MembershipContext } from './types.ts'
 import styles from './FamilyProvider.module.css'
@@ -27,6 +28,10 @@ export function FamilyGate() {
     if (!familyId || !membershipsQuery.data) return undefined
     return membershipsQuery.data.find((m) => m.family_id === familyId)
   }, [familyId, membershipsQuery.data])
+
+  if (!familyId || !isUuid(familyId)) {
+    return <Navigate to="/" replace />
+  }
 
   if (membershipsQuery.isLoading) {
     return (

@@ -6,6 +6,6 @@ test('sign-in page loads', async ({ page }) => {
     page.getByRole('heading', { name: 'Stay In Touch' }),
   ).toBeVisible()
   await expect(
-    page.getByRole('button', { name: 'Email me a sign-in link' }),
+    page.getByRole('tab', { name: 'Email me a sign-in link' }),
   ).toBeVisible()
 })

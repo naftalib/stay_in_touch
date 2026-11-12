@@ -1,0 +1,12 @@
+.root {
+  padding: var(--space-5);
+  max-inline-size: 36rem;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--size-touch-min);
+  margin-block-start: var(--space-4);
+  color: var(--color-accent);
+}

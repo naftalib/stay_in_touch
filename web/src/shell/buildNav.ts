@@ -7,6 +7,11 @@ export type NavSpace = {
   sortOrder: number
   archivedAt: string | null
   unreadCount: number
+  ownerMemberId: string | null
+}
+
+export type NavSibling = {
+  label: string
 }
 
 export type NavItem =
@@ -17,66 +22,87 @@ export type NavItem =
       kind: SpaceKind
       unreadCount: number
       archived: boolean
+      badgeA11y: string
     }
   | {
-      type: 'link'
-      to: string
+      type: 'sibling'
       label: string
-      minRole: FamilyRole
+      hint: string
     }
 
-const ROLE_RANK: Record<FamilyRole, number> = {
-  member: 0,
-  grandparent: 1,
-  admin: 2,
+function unreadBadgeA11y(label: string, count: number, kind: SpaceKind): string {
+  const place = kind === 'general' ? label : `${label}'s space`
+  return `${place}, ${count} new message${count === 1 ? '' : 's'}`
 }
 
-function roleAtLeast(role: FamilyRole, min: FamilyRole): boolean {
-  return ROLE_RANK[role] >= ROLE_RANK[min]
+function sortSpaces(spaces: NavSpace[]): NavSpace[] {
+  return [...spaces].sort(
+    (a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title),
+  )
 }
 
-/** Build sidebar navigation for the current family, filtered by role. */
-export function buildNav(role: FamilyRole, spaces: NavSpace[]): NavItem[] {
-  const visibleSpaces = spaces.filter((space) => {
-    if (space.archivedAt && role !== 'admin') {
-      return false
+/**
+ * Build sidebar navigation for the current family, filtered by role.
+ * Children see sibling names as non-interactive labels; parent spaces are omitted.
+ */
+export function buildNav(
+  role: FamilyRole,
+  myMemberId: string,
+  spaces: NavSpace[],
+  siblings: NavSibling[] = [],
+): NavItem[] {
+  const sorted = sortSpaces(spaces)
+
+  const visibleSpaces =
+    role === 'member'
+      ? sorted.filter(
+          (s) =>
+            s.kind === 'general' ||
+            (s.ownerMemberId !== null && s.ownerMemberId === myMemberId),
+        )
+      : sorted
+
+  const spaceItems: NavItem[] = visibleSpaces.map((space) => ({
+    type: 'space',
+    spaceId: space.id,
+    label: space.title,
+    kind: space.kind,
+    unreadCount: space.unreadCount,
+    archived: space.archivedAt !== null,
+    badgeA11y: unreadBadgeA11y(space.title, space.unreadCount, space.kind),
+  }))
+
+  const siblingItems: NavItem[] =
+    role === 'member'
+      ? siblings.map((s) => ({
+          type: 'sibling' as const,
+          label: s.label,
+          hint: 'Private',
+        }))
+      : []
+
+  const combined = [...spaceItems]
+  for (const sibling of siblingItems) {
+    const insertAt = combined.findIndex(
+      (item) => item.type === 'space' && item.kind === 'member',
+    )
+    if (insertAt === -1) {
+      combined.push(sibling)
+    } else {
+      combined.splice(insertAt + 1, 0, sibling)
     }
-    return true
-  })
-
-  const spaceItems: NavItem[] = visibleSpaces
-    .slice()
-    .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title))
-    .map((space) => ({
-      type: 'space',
-      spaceId: space.id,
-      label: space.title,
-      kind: space.kind,
-      unreadCount: space.unreadCount,
-      archived: space.archivedAt !== null,
-    }))
-
-  const links: NavItem[] = [
-    {
-      type: 'link',
-      to: 'members',
-      label: 'Family members',
-      minRole: 'member',
-    },
-  ]
-
-  if (roleAtLeast(role, 'admin')) {
-    links.push({
-      type: 'link',
-      to: 'settings',
-      label: 'Family settings',
-      minRole: 'admin',
-    })
   }
 
-  const allowedLinks = links.filter(
-    (item) => item.type === 'link' && roleAtLeast(role, item.minRole),
-  )
+  return combined
+}
 
-  return [...spaceItems, ...allowedLinks]
+/** Sibling labels for a child member (other member-role children in the family). */
+export function siblingLabelsForChild(
+  myMemberId: string,
+  members: { id: string; label: string; role: FamilyRole }[],
+): NavSibling[] {
+  return members
+    .filter((m) => m.role === 'member' && m.id !== myMemberId)
+    .map((m) => ({ label: m.label }))
+    .sort((a, b) => a.label.localeCompare(b.label))
 }

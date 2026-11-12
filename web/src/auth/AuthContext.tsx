@@ -7,58 +7,110 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { useNavigate } from 'react-router'
 import type { Session, User } from '@supabase/supabase-js'
+import { useQueryClient } from '@tanstack/react-query'
 import { getSupabase } from '../lib/supabase.ts'
+export type AuthStatus = 'loading' | 'signedIn' | 'signedOut'
 
 type AuthContextValue = {
+  status: AuthStatus
   session: Session | null
   user: User | null
   loading: boolean
+  displayName: string | undefined
   signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+async function fetchDisplayName(userId: string): Promise<string | undefined> {
+  const supabase = getSupabase()
+  const { data } = await supabase
+    .from('profiles')
+    .select('display_name')
+    .eq('id', userId)
+    .maybeSingle()
+  return data?.display_name ?? undefined
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [status, setStatus] = useState<AuthStatus>('loading')
+  const [displayName, setDisplayName] = useState<string | undefined>()
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+
+  const clearClientState = useCallback(async () => {
+    const supabase = getSupabase()
+    await supabase.removeAllChannels()
+    queryClient.clear()
+    setDisplayName(undefined)
+  }, [queryClient])
 
   useEffect(() => {
     const supabase = getSupabase()
 
     supabase.auth
       .getSession()
-      .then(({ data }) => {
+      .then(async ({ data }) => {
         setSession(data.session)
+        if (data.session?.user) {
+          setStatus('signedIn')
+          const name = await fetchDisplayName(data.session.user.id)
+          setDisplayName(name ?? data.session.user.email ?? undefined)
+        } else {
+          setStatus('signedOut')
+        }
       })
-      .finally(() => {
-        setLoading(false)
+      .catch(() => {
+        setStatus('signedOut')
       })
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, next) => {
+    } = supabase.auth.onAuthStateChange(async (event, next) => {
       setSession(next)
-      setLoading(false)
+      if (next?.user) {
+        setStatus('signedIn')
+        const name = await fetchDisplayName(next.user.id)
+        setDisplayName(name ?? next.user.email ?? undefined)
+        if (event === 'TOKEN_REFRESHED') {
+          await supabase.realtime.setAuth()
+        }
+      } else {
+        setStatus('signedOut')
+        await clearClientState()
+        if (event === 'SIGNED_OUT') {
+          navigate('/sign-in', {
+            replace: true,
+            state: { signedOut: true },
+          })
+        }
+      }
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [clearClientState, navigate])
 
   const signOut = useCallback(async () => {
+    await clearClientState()
     await getSupabase().auth.signOut()
-  }, [])
+    navigate('/sign-in', { replace: true })
+  }, [clearClientState, navigate])
 
   const value = useMemo<AuthContextValue>(
     () => ({
+      status,
       session,
       user: session?.user ?? null,
-      loading,
+      loading: status === 'loading',
+      displayName,
       signOut,
     }),
-    [loading, session, signOut],
+    [displayName, session, signOut, status],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
