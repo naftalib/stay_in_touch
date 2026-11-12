@@ -4,4 +4,4 @@ globs: docs/**
 alwaysApply: false
 ---
 
-When a decision changes, update `docs/decisions.md` in the same change. `docs/architecture.md` should stay aligned with the database and access model.
+When a decision changes, add or update an ADR under `docs/decisions/` and link it from `docs/decisions.md` in the same change. Add a build log entry in `docs/build-log/` for each handoff PR. Keep `docs/architecture.md` aligned with the database and access model.

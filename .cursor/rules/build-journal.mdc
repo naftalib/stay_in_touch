@@ -1,0 +1,12 @@
+---
+description: Build journal and ADRs on every handoff PR
+alwaysApply: true
+---
+
+Every handoff pull request must:
+
+1. Add or update its entry in `docs/build-log/` using the next `NN-short-slug.md` file and [`docs/build-log/_template.md`](../../docs/build-log/_template.md).
+2. Record new or changed decisions as numbered ADRs under `docs/decisions/` and link them from `docs/decisions.md`.
+3. Update `docs/architecture.md` when repo layout or system boundaries change (overview diagram and folder table at the top when structure changes).
+
+Do not rewrite history inside old build log entries. Append follow-up notes in a later entry instead.

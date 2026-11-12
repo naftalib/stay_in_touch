@@ -11,7 +11,7 @@ web/                  Vite + React + TypeScript placeholder
 supabase/             CLI project: migrations, seed, pgTAP tests
 supabase/functions/   Edge Functions (README only)
 api/                  Reserved for a later FastAPI service
-docs/                 Architecture, decisions, hosted settings
+docs/                 Architecture, ADRs, build log, hosted settings
 .cursor/rules/        Scoped agent rules
 .github/workflows/    CI
 ```
@@ -64,3 +64,7 @@ pnpm lint && pnpm typecheck && pnpm build
 There is also a pending invitation for `aunt@example.test`. General has a quote-reply and one soft-deleted message. Media rows use fake R2 keys and are marked `ready`.
 
 pgTAP tests do not use this seed. They build a second family and a removed member of their own, then roll back.
+
+## Build journal
+
+How the app was built handoff by handoff: [`docs/build-log/`](docs/build-log/). Architecture decisions: [`docs/decisions.md`](docs/decisions.md).

@@ -1,5 +1,56 @@
 # Architecture
 
+## Overview
+
+Stay In Touch is a private, invite-only family social app: one family per tenant, spaces for General, each parent, and each child, with grandparents able to visit every space. The repo today is a **monorepo skeleton plus the full database layer**; the web UI, Edge Functions, media upload, email, and push are planned.
+
+```mermaid
+flowchart LR
+  subgraph client["Client (planned PWA)"]
+    Web["Vite + React + TS\nReact Aria, CSS Modules"]
+  end
+  subgraph cf["Cloudflare (planned)"]
+    Pages["Static / PWA host"]
+    R2["R2 object storage"]
+  end
+  subgraph supa["Supabase (in repo today)"]
+    Auth["Auth"]
+    PG["Postgres + RLS"]
+    RT["Realtime Broadcast"]
+    EF["Edge Functions (README only)"]
+  end
+  subgraph notify["Notifications (planned)"]
+    Resend["Resend SMTP"]
+    Push["Web Push / VAPID"]
+  end
+  subgraph future["Future"]
+    API["FastAPI on Cloud Run\napi/ folder"]
+  end
+  Web --> Pages
+  Web --> Auth
+  Web --> PG
+  Web --> RT
+  Web -.-> EF
+  EF -.-> R2
+  EF -.-> PG
+  Auth -.-> Resend
+  Web -.-> Push
+  API -.-> PG
+```
+
+| Folder | Responsibility | Status |
+|---|---|---|
+| `web/` | PWA UI, Supabase client, accessibility-first components | Placeholder page only |
+| `supabase/` | Migrations, seed, pgTAP tests, local CLI config | **Implemented** |
+| `supabase/functions/` | Signed URLs, media status, outbox workers | README only |
+| `api/` | Later AI / Python services | README only |
+| `docs/` | Architecture, ADRs, build log, hosted checklist | Living docs |
+| `.github/workflows/` | Web lint/build and database CI | **Implemented** |
+
+For roles, tables, RLS, RPCs, and Realtime behavior, see the sections below. Planning ADRs are in [`docs/decisions/`](./decisions/).
+
+---
+
 Stay In Touch is a private, invite-only family app. One family has a General space plus one space for each parent and child. Grandparents do not get a space. Each space holds photos, videos, and one flat message thread. A message may quote-reply to another message in the same space. There is no UI for this yet. This document is the database and access model the UI will sit on.
 
 ## Stack
