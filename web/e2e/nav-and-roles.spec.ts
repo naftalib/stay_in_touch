@@ -27,6 +27,15 @@ test('noa sees limited nav', async ({ page }) => {
   })
   await ensureSpacesNavOpen(page)
   const nav = spacesNav(page)
+  await expect
+    .poll(
+      async () => {
+        const text = await nav.innerText()
+        return text.includes('Ari') && text.includes('Private')
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(true)
   await expect(nav.getByRole('link', { name: /General/ })).toBeVisible({
     timeout: 15_000,
   })
@@ -34,12 +43,10 @@ test('noa sees limited nav', async ({ page }) => {
     timeout: 15_000,
   })
   // Sibling label is visible text plus "Private"; sr-only full phrase is not a Playwright-visible target.
-  await expect(
-    nav
-      .getByRole('listitem')
-      .filter({ hasText: 'Ari' })
-      .filter({ hasText: 'Private' }),
-  ).toBeVisible({ timeout: 15_000 })
+  await expect(nav.getByText('Ari', { exact: true })).toBeVisible({
+    timeout: 15_000,
+  })
+  await expect(nav.getByText('Private', { exact: true })).toBeVisible()
   await expect(nav.getByRole('link', { name: 'Mom' })).toHaveCount(0)
 })
 

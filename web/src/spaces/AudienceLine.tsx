@@ -1,6 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
-import { fetchSpaceAudience } from '../family/fetchSpaceAudience.ts'
-import { queryKeys } from '../lib/queryKeys.ts'
+import { useSpaceAudience } from '../family/useSpaceAudience.ts'
 import styles from './AudienceLine.module.css'
 
 type AudienceLineProps = {
@@ -22,11 +20,7 @@ function formatAudienceList(
 }
 
 export default function AudienceLine({ spaceId }: AudienceLineProps) {
-  const query = useQuery({
-    queryKey: queryKeys.audience(spaceId),
-    queryFn: () => fetchSpaceAudience(spaceId),
-    enabled: Boolean(spaceId),
-  })
+  const query = useSpaceAudience(spaceId)
 
   if (query.isLoading) {
     return (

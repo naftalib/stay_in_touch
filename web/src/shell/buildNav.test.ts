@@ -112,10 +112,10 @@ describe('buildNav', () => {
   })
 
   it('derives sibling labels from general audience', () => {
-    const siblings = siblingLabelsFromAudience('Noa', [
-      { label: 'Noa', role: 'member' },
-      { label: 'Ari', role: 'member' },
-      { label: 'Mom', role: 'admin' },
+    const siblings = siblingLabelsFromAudience('noa-user', [
+      { user_id: 'noa-user', label: 'Noa', role: 'member' },
+      { user_id: 'ari-user', label: 'Ari', role: 'member' },
+      { user_id: 'mom-user', label: 'Mom', role: 'admin' },
     ])
     expect(siblings).toEqual([{ label: 'Ari' }])
   })

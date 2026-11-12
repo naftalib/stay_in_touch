@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Link, Outlet, useMatch, useParams } from 'react-router'
 import {
   Button,
@@ -10,10 +9,9 @@ import {
 } from 'react-aria-components'
 import { useAuth } from '../auth/AuthContext.tsx'
 import { useFamily } from '../family/FamilyProvider.tsx'
-import { fetchSpaceAudience } from '../family/fetchSpaceAudience.ts'
+import { useSpaceAudience } from '../family/useSpaceAudience.ts'
 import { useSpaces } from '../family/useSpaces.ts'
 import { useUnreadCounts } from '../family/useUnreadCounts.ts'
-import { queryKeys } from '../lib/queryKeys.ts'
 import {
   buildNav,
   siblingLabelsFromAudience,
@@ -36,7 +34,7 @@ export default function AppShell() {
   const matchSpace = useMatch('/f/:familyId/s/:spaceId/:tab')
   const activeSpaceId = matchSpace?.params.spaceId ?? spaceId
 
-  const { membership, role, memberId } = useFamily()
+  const { membership, role, memberId, userId } = useFamily()
   const { signOut, displayName } = useAuth()
   const activeFamilyId = familyId ?? membership.family_id
   const spacesQuery = useSpaces(activeFamilyId)
@@ -87,19 +85,15 @@ export default function AppShell() {
     [navSpaces],
   )
 
-  const generalAudienceQuery = useQuery({
-    queryKey: queryKeys.audience(generalSpaceId ?? 'none'),
-    queryFn: () => fetchSpaceAudience(generalSpaceId!),
-    enabled: role === 'member' && Boolean(generalSpaceId),
-  })
+  const generalAudienceQuery = useSpaceAudience(
+    generalSpaceId,
+    role === 'member',
+  )
 
   const siblings = useMemo(() => {
     if (role !== 'member' || !generalAudienceQuery.data) return []
-    return siblingLabelsFromAudience(
-      membership.label,
-      generalAudienceQuery.data,
-    )
-  }, [generalAudienceQuery.data, membership.label, role])
+    return siblingLabelsFromAudience(userId, generalAudienceQuery.data)
+  }, [generalAudienceQuery.data, role, userId])
 
   const navItems = buildNav(role, memberId, navSpaces, siblings)
   const activeSpace = spacesQuery.data?.find((s) => s.id === activeSpaceId)
