@@ -205,10 +205,10 @@ select throws_ok(
   '23503', NULL, 'a member removed moments ago cannot post'
 );
 
--- Archived spaces: documented as still postable. Assert it so a change is deliberate.
+-- Archived spaces are read-only, including for the admin who archived them.
 select test.login('mom@fixture.test');
-select is(
-  test.rows($$
+select throws_ok(
+  $$
     insert into public.messages (space_id, family_id, author_member_id, body, created_by)
     values (
       'b3000000-0000-4000-8000-000000000005',
@@ -217,8 +217,8 @@ select is(
       'Posting into an archived space',
       'b1000000-0000-4000-8000-000000000001'
     )
-  $$),
-  1, 'archived spaces stay postable (documented open question)'
+  $$,
+  '42501', NULL, 'an admin cannot post in an archived space'
 );
 
 -- Known gaps (TODO until fixed).

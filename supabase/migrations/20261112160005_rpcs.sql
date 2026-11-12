@@ -419,8 +419,44 @@ begin
 end;
 $$;
 
--- Matches the signed-in user's auth.users email (not a client-supplied email
--- or role). A removed member accepting a new invite is reactivated in place.
+create or replace function public.unarchive_space(p_space_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  target public.spaces%rowtype;
+begin
+  select * into target from public.spaces where id = p_space_id;
+  if not found then
+    raise exception 'space not found'
+      using errcode = '42501';
+  end if;
+
+  perform private.assert_family_admin(target.family_id);
+
+  if target.archived_at is null then
+    return;
+  end if;
+
+  update public.spaces
+  set archived_at = null
+  where id = target.id;
+
+  perform private.write_audit(
+    target.family_id,
+    'space.unarchived',
+    target.id::text,
+    jsonb_build_object('title', target.title)
+  );
+end;
+$$;
+
+-- Matches the signed-in user's confirmed auth.users email, not a client-supplied
+-- email or role. A parent cannot accept a child's +alias invite while signed
+-- in as the parent: the alias is its own user, and the emails do not match.
+-- A removed member accepting a new invite is reactivated in place.
 create or replace function public.accept_invite(p_invitation_id uuid)
 returns uuid
 language plpgsql
@@ -617,38 +653,49 @@ begin
   select
     s.id,
     (
+      -- One item per message. Attached media does not add another.
       select count(*)::bigint
       from public.messages msg
       where msg.space_id = s.id
         and msg.deleted_at is null
-        and msg.author_member_id <> caller_member
-        and msg.created_at > coalesce(
+        and (
           (
-            select sr.last_read_at
-            from public.space_reads sr
-            where sr.space_id = s.id
-              and sr.member_id = caller_member
-          ),
-          '-infinity'::timestamptz
+            msg.author_member_id <> caller_member
+            and msg.created_at > read_at.last_read_at
+          )
+          or exists (
+            select 1
+            from public.media med
+            where med.message_id = msg.id
+              and med.space_id = s.id
+              and med.deleted_at is null
+              and med.uploader_member_id <> caller_member
+              and med.created_at > read_at.last_read_at
+          )
         )
     )
     + (
+      -- Standalone media, not attached to a message, is its own item.
       select count(*)::bigint
       from public.media med
       where med.space_id = s.id
+        and med.message_id is null
         and med.deleted_at is null
         and med.uploader_member_id <> caller_member
-        and med.created_at > coalesce(
-          (
-            select sr.last_read_at
-            from public.space_reads sr
-            where sr.space_id = s.id
-              and sr.member_id = caller_member
-          ),
-          '-infinity'::timestamptz
-        )
+        and med.created_at > read_at.last_read_at
     )
   from public.spaces s
+  cross join lateral (
+    select coalesce(
+      (
+        select sr.last_read_at
+        from public.space_reads sr
+        where sr.space_id = s.id
+          and sr.member_id = caller_member
+      ),
+      '-infinity'::timestamptz
+    ) as last_read_at
+  ) read_at
   where s.family_id = p_family_id
     and s.id in (select private.viewable_space_ids())
   order by s.sort_order, s.created_at;
@@ -698,6 +745,7 @@ revoke all on function public.change_member_role(uuid, public.family_role) from 
 revoke all on function public.create_member_space(uuid, uuid, text) from public, anon;
 revoke all on function public.rename_space(uuid, text) from public, anon;
 revoke all on function public.archive_space(uuid) from public, anon;
+revoke all on function public.unarchive_space(uuid) from public, anon;
 revoke all on function public.accept_invite(uuid) from public, anon;
 revoke all on function public.space_audience(uuid) from public, anon;
 revoke all on function public.unread_counts(uuid) from public, anon;
@@ -710,6 +758,7 @@ grant execute on function public.change_member_role(uuid, public.family_role) to
 grant execute on function public.create_member_space(uuid, uuid, text) to authenticated;
 grant execute on function public.rename_space(uuid, text) to authenticated;
 grant execute on function public.archive_space(uuid) to authenticated;
+grant execute on function public.unarchive_space(uuid) to authenticated;
 grant execute on function public.accept_invite(uuid) to authenticated;
 grant execute on function public.space_audience(uuid) to authenticated;
 grant execute on function public.unread_counts(uuid) to authenticated;
@@ -722,6 +771,7 @@ grant execute on function public.change_member_role(uuid, public.family_role) to
 grant execute on function public.create_member_space(uuid, uuid, text) to service_role;
 grant execute on function public.rename_space(uuid, text) to service_role;
 grant execute on function public.archive_space(uuid) to service_role;
+grant execute on function public.unarchive_space(uuid) to service_role;
 grant execute on function public.accept_invite(uuid) to service_role;
 grant execute on function public.space_audience(uuid) to service_role;
 grant execute on function public.unread_counts(uuid) to service_role;

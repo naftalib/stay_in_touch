@@ -132,7 +132,7 @@ create policy messages_update on public.messages
   for update
   to authenticated
   using (
-    space_id in (select private.viewable_space_ids())
+    space_id in (select private.postable_space_ids())
     and (
       (
         deleted_at is null
@@ -142,7 +142,7 @@ create policy messages_update on public.messages
     )
   )
   with check (
-    space_id in (select private.viewable_space_ids())
+    space_id in (select private.postable_space_ids())
     and (
       author_member_id in (select m.member_id from private.my_memberships() m)
       or private.is_family_admin(family_id)
@@ -178,7 +178,7 @@ create policy media_update on public.media
   for update
   to authenticated
   using (
-    space_id in (select private.viewable_space_ids())
+    space_id in (select private.postable_space_ids())
     and (
       (
         deleted_at is null
@@ -188,7 +188,7 @@ create policy media_update on public.media
     )
   )
   with check (
-    space_id in (select private.viewable_space_ids())
+    space_id in (select private.postable_space_ids())
     and (
       uploader_member_id in (select m.member_id from private.my_memberships() m)
       or private.is_family_admin(family_id)

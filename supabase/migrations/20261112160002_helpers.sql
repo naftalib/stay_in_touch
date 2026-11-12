@@ -77,7 +77,8 @@ as $$
   where m.member_id in (select private.space_viewer_member_ids(s.id))
 $$;
 
--- Separate from viewable so a future read-only role can diverge.
+-- Visible spaces the caller may still change. An archived space stays in
+-- viewable_space_ids() and drops out of this set, including for admins.
 create or replace function private.postable_space_ids()
 returns setof uuid
 language sql
@@ -85,7 +86,10 @@ stable
 security definer
 set search_path = ''
 as $$
-  select private.viewable_space_ids()
+  select s.id
+  from public.spaces s
+  where s.id in (select private.viewable_space_ids())
+    and s.archived_at is null
 $$;
 
 create or replace function private.caller_owns_member(p_member_id uuid)
