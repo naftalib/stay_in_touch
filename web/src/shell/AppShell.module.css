@@ -1,0 +1,123 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100dvb;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-block: var(--space-4);
+  padding-inline: var(--space-5);
+  background: var(--color-surface);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.brandLink {
+  font-size: var(--text-step-large);
+  font-weight: 700;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.role {
+  color: var(--color-text-muted);
+  font-size: 0.9em;
+}
+
+.signOut {
+  min-block-size: var(--size-touch-min);
+  padding-inline: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.signOut:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(12rem, 16rem) 1fr;
+  flex: 1;
+  min-block-size: 0;
+}
+
+@media (max-width: 48rem) {
+  .body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+}
+
+.nav {
+  padding: var(--space-4);
+  border-inline-end: 1px solid var(--color-border);
+  background: var(--color-surface);
+  overflow-y: auto;
+}
+
+.navList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.navLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-block-size: var(--size-touch-min);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--color-text);
+}
+
+.navLink:hover {
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.navLinkActive {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  font-weight: 600;
+}
+
+.navLinkArchived {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.badge {
+  min-inline-size: 1.5rem;
+  padding-inline: var(--space-2);
+  border-radius: 999px;
+  background: var(--color-unread);
+  color: var(--color-accent-on);
+  font-size: 0.85em;
+  font-weight: 700;
+  text-align: center;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+  overflow: hidden;
+}

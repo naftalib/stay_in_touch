@@ -1,0 +1,8 @@
+.page {
+  padding: var(--space-6);
+  max-inline-size: 40rem;
+}
+
+.page h1 {
+  margin-block-end: var(--space-3);
+}
