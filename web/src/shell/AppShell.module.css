@@ -1,0 +1,119 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100dvb;
+}
+
+.skip {
+  position: absolute;
+  inset-inline-start: var(--space-4);
+  inset-block-start: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  z-index: 200;
+  transform: translateY(-200%);
+  transition: transform 0.15s;
+}
+
+.skip:focus {
+  transform: translateY(0);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-block: var(--space-4);
+  padding-inline: var(--space-5);
+  background: var(--color-surface);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.headerStart {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.brandLink {
+  font-size: var(--text-step-large);
+  font-weight: 700;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.spacesButton {
+  min-block-size: var(--size-touch-min);
+  min-inline-size: var(--size-touch-min);
+  padding-inline: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(12rem, 16rem) 1fr;
+  flex: 1;
+  min-block-size: 0;
+}
+
+@media (max-width: 56.25rem) {
+  .body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.aside {
+  border-inline-end: 1px solid var(--color-border);
+  background: var(--color-surface);
+  min-block-size: 0;
+  overflow: hidden;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+  overflow: hidden;
+}
+
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, #000 40%, transparent);
+  z-index: 100;
+}
+
+.drawerModal {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: min(20rem, 90vw);
+  background: var(--color-surface);
+  box-shadow: 4px 0 24px color-mix(in srgb, #000 15%, transparent);
+}
+
+.drawerDialog {
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+  outline: none;
+}
+
+.drawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.drawerHeader h2 {
+  margin: 0;
+}

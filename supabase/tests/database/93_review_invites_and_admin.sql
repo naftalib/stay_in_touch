@@ -154,8 +154,8 @@ select throws_ok(
 select test.login('mom@fixture.test');
 select public.revoke_invitation('b6000000-0000-4000-8000-000000000001');
 select public.change_member_role('b2000000-0000-4000-8000-000000000004', 'member');
-select public.archive_space('b3000000-0000-4000-8000-000000000005');
 select public.rename_space('b3000000-0000-4000-8000-000000000005', 'Ari (archived)');
+select public.archive_space('b3000000-0000-4000-8000-000000000005');
 select public.remove_member('b2000000-0000-4000-8000-000000000006');
 select set_config(
   'test.grandpa_space',
@@ -221,7 +221,6 @@ select throws_ok(
   '42501', NULL, 'an admin cannot post in an archived space'
 );
 
--- Known gaps (TODO until fixed).
 reset role;
 update public.family_members set status = 'removed', removed_at = now() where id = 'b2000000-0000-4000-8000-000000000005';
 insert into public.invitations (id, family_id, email, role, label, create_space, invited_by, expires_at)

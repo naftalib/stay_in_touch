@@ -1,0 +1,8 @@
+.root {
+  padding: var(--space-5);
+}
+
+.empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+}

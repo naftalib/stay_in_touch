@@ -119,7 +119,6 @@ select is(
   1, 'a media update broadcasts to its space topic'
 );
 
--- Known gaps (TODO until fixed).
 select is(
   (
     select payload -> 'record' ->> 'body'

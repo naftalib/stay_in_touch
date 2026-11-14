@@ -1,7 +1,5 @@
 -- Review: edit and delete with row counts and re-reads, media edit rules,
--- immutable columns, and insert-time integrity. Known gaps are TODO blocks:
--- they report as "not ok # TODO" without failing the suite, and should pass
--- once fixed.
+-- immutable columns, and insert-time integrity.
 begin;
 select set_config('search_path', 'public, extensions', true);
 
@@ -180,7 +178,6 @@ select throws_ok(
   '23514', NULL, 'media r2_key cannot point at another family''s object'
 );
 
--- Known gaps (TODO until fixed).
 reset role;
 update public.messages set deleted_at = now() where id = 'b4000000-0000-4000-8000-000000000006';
 select test.login('grandma@fixture.test');

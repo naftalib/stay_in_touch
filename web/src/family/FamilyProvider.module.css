@@ -1,0 +1,20 @@
+.loading {
+  padding: var(--space-8);
+  text-align: center;
+}
+
+.error {
+  padding: var(--space-8);
+  color: var(--color-danger);
+  text-align: center;
+}
+
+.empty {
+  max-inline-size: 32rem;
+  margin-inline: auto;
+  padding: var(--space-8);
+}
+
+.empty h1 {
+  margin-block-end: var(--space-3);
+}

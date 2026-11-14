@@ -3,6 +3,11 @@
 ## Context
 Grandparents visit all rooms but are not a separate "household" within the app.
 
+## Options considered
+- **Chosen (A):** No grandparent-owned space for now.
+- **B:** One shared Grandparents space.
+- **C:** One space per grandparent.
+
 ## Decision
 No grandparent-owned space for now. Grandparents have role `grandparent` and no `spaces` row.
 

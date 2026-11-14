@@ -1,0 +1,121 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+  min-block-size: 0;
+}
+
+.nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+
+.navList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.navLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-block-size: var(--size-touch-min);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--color-text);
+}
+
+.navLink:hover {
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.navLinkActive {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  font-weight: 600;
+}
+
+.navLinkArchived {
+  opacity: 0.85;
+}
+
+.navLabel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.archivedTag {
+  font-size: 0.75em;
+  font-weight: 600;
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.badge {
+  min-inline-size: 1.5rem;
+  padding-inline: var(--space-2);
+  border-radius: 999px;
+  background: var(--color-unread);
+  color: var(--color-accent-on);
+  font-size: 0.85em;
+  font-weight: 700;
+  text-align: center;
+}
+
+.sibling {
+  min-block-size: var(--size-touch-min);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-inline: var(--space-3);
+  color: var(--color-text-muted);
+}
+
+.siblingName {
+  font-weight: 500;
+}
+
+.siblingHint {
+  font-size: 0.85em;
+  font-style: italic;
+}
+
+.footer {
+  padding: var(--space-4);
+  border-block-start: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.signedInAs {
+  margin: 0;
+  font-size: 0.9em;
+  color: var(--color-text-muted);
+}
+
+.signOut {
+  min-block-size: var(--size-touch-min);
+  padding-inline: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.signOut:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: 2px;
+}

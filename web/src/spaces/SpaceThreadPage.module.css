@@ -1,0 +1,8 @@
+.unavailable {
+  padding: var(--space-8);
+  max-inline-size: 36rem;
+}
+
+.unavailable h1 {
+  margin-block-end: var(--space-3);
+}

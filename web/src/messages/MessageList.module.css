@@ -1,0 +1,78 @@
+.wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+}
+
+.newMessages {
+  position: absolute;
+  inset-block-end: var(--space-4);
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  min-block-size: var(--size-touch-min);
+  padding-inline: var(--space-4);
+  border: none;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-accent-on);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+}
+
+.scroller {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+  min-block-size: 0;
+  overflow-anchor: auto;
+}
+
+.loadMore {
+  display: block;
+  margin-block-end: var(--space-4);
+  margin-inline: auto;
+  min-block-size: var(--size-touch-min);
+  padding-inline: var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+.start {
+  margin-block-end: var(--space-4);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.9em;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.dayItem {
+  list-style: none;
+}
+
+.daySep {
+  display: block;
+  text-align: center;
+  margin-block: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: 0.9em;
+  font-weight: 600;
+}
+
+.item {
+  list-style: none;
+}

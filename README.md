@@ -2,12 +2,12 @@
 
 A private, invite-only app for one family. Parents and children each have a space, grandparents can see every space, and children see only General and their own space.
 
-This repository has the monorepo skeleton and the database. There is no product UI yet. The page in `web/` is a placeholder.
+This repository has the monorepo skeleton, the database, and the first signed-in screens: password and email-code sign-in, the family shell, and message threads.
 
 ## Layout
 
 ```
-web/                  Vite + React + TypeScript placeholder
+web/                  Vite + React + TypeScript app
 supabase/             CLI project: migrations, seed, pgTAP tests
 supabase/functions/   Edge Functions (README only)
 api/                  Reserved for a later FastAPI service
@@ -44,7 +44,11 @@ supabase db reset          # migrations and seed from scratch
 pnpm db:test               # pgTAP
 pnpm db:lint               # plpgsql_check and security advisors
 pnpm lint && pnpm typecheck && pnpm build
+pnpm test                  # Vitest unit tests in web/
+pnpm test:e2e              # Playwright; needs supabase start, .env, and a built or running app
 ```
+
+`pnpm test:e2e` resets the local database, then runs Chromium, WebKit, and the iPhone 13 project one at a time against `http://127.0.0.1:5173`. Set `CI=true` to exercise the production preview build (`pnpm --filter web build` first). The suite shares one database, so it does not run tests in parallel.
 
 `pnpm db:start`, `pnpm db:reset`, and `pnpm db:test` wrap the same Supabase commands.
 

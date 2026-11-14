@@ -15,12 +15,59 @@ jobs:
           version: 10.33.4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
+      - run: pnpm --filter web test
       - run: pnpm build
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.1.0
+      - name: Start Supabase (auth, API, Realtime, Mailpit)
+        run: supabase start -x studio,storage-api,imgproxy,edge-runtime,logflare,vector,supavisor
+      - name: Reset database
+        run: supabase db reset
+      - name: Check generated types drift
+        run: |
+          pnpm db:types
+          git diff --exit-code web/src/lib/database.types.ts
+      - name: Export local Supabase env
+        run: |
+          supabase status -o env | tee /tmp/supabase.env
+          set -a && . /tmp/supabase.env && set +a
+          echo "VITE_SUPABASE_URL=${API_URL}" >> "$GITHUB_ENV"
+          key="${ANON_KEY:-${PUBLISHABLE_KEY}}"
+          echo "VITE_SUPABASE_PUBLISHABLE_KEY=${key}" >> "$GITHUB_ENV"
+      - run: pnpm --filter web build
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium webkit
+        working-directory: web
+      - name: E2E tests
+        run: pnpm --filter web test:e2e
+        env:
+          CI: true
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          if-no-files-found: ignore
 
   db:
     runs-on: ubuntu-latest
