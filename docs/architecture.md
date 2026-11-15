@@ -175,7 +175,7 @@ Realtime authorizes when the client joins and keeps that decision until the JWT 
 
 ## Photos (handoff 05)
 
-Limits, enforced in SQL: JPEG, 5 MB per file, 10 photos per post, 100 media rows per member per rolling day, 800 MB app-wide (`private.app_limits`). `reserve_photo_upload` holds advisory lock `83427601` until the transaction ends. Pending and failed rows are visible only to the uploader. A blank message is allowed only while a photo is attached.
+Limits, enforced in SQL: JPEG, 5 MB per file, 10 photos per post, 100 media rows per member per rolling day, 800 MB app-wide (`private.app_limits`). `reserve_photo_upload` holds advisory lock `83427601` until the transaction ends. The reservation stores `media.provider` from `MEDIA_PROVIDER` (default `supabase`). Pending and failed rows are visible only to the uploader. A blank message is allowed only while a photo is attached; deleting its last photo soft-deletes the message. Signed view URLs are reused for about 50 minutes. storage-api's signed GET sends `Expires` at the token end and does not echo the object's `Cache-Control`.
 
 Provider modules live in `supabase/functions/_shared/media/`. `MEDIA_PROVIDER=supabase` is the tested path. `r2` and `b2` share the S3 module and are unit-tested only.
 
@@ -198,7 +198,7 @@ sequenceDiagram
   EF-->>Browser: Signed GET links, 1 hour
 ```
 
-`media-cleanup` runs with `x-media-cleanup-secret` and deletes orphan objects older than 24 hours. The Video tab is hidden. `/video` redirects to messages.
+`media-cleanup` runs with `x-media-cleanup-secret` and deletes orphan objects older than 24 hours, including soft-deleted uploads that were never attached to a message. Attached photos stay so an admin can restore them. The Video tab is hidden. `/video` redirects to messages.
 
 ## Media flow (later)
 

@@ -26,14 +26,26 @@ CI in this repo runs on `pull_request` and on pushes to `main`, so this branch h
 
 ## Review findings and how each was resolved
 
-Left for the reviewer.
+Reviewed on 2026-11-15 by a separate Grok 4.7 agent. The stack was started locally with storage-api (`supabase start -x studio,imgproxy,logflare,vector,supavisor`) after setting the legacy iptables FORWARD policy to ACCEPT so containers could reach Postgres.
+
+1. **Pending rows were stored as `provider = r2`.** `reserve_photo_upload` inserted `'r2'` and the column default was `r2`, so a supabase-only upload looked like an R2 object until finish. Fixed in `20261115220000_review_photo_fixes.sql` and `media-upload-url`: the reservation records `MEDIA_PROVIDER` (default `supabase`). ADR 0074. Direct client inserts are still rejected by the trigger.
+2. **The 800 MB race only checked that one session held the advisory lock.** `101_photo_cap_race.sql` commits a near-cap row on a second connection, starts two reservations, and checks that the second waits on lock `83427601` and then fails with `22023`. Only one pending row is stored.
+3. **Signed GET has no `Cache-Control`.** Confirmed on storage-api v1.90.1: the object metadata stores `cacheControl: max-age=31536000`, and `getSignedObject` does not copy it. The response does send `Expires` at the token expiry (observed: one hour after `Date`). The client already reuses the URL for 50 minutes, so a repeat view of that URL is a browser cache hit and does not spend egress. Proxying the bytes would spend egress twice, and a long-lived media-id cache would outlive the one-hour link a removed member may keep. Documented in ADR 0075. No proxy.
+4. **Deleting the last photo of a blank message soft-deletes the message.** This matches ADR 0072 and the handoff's suggested behaviour. pgTAP now covers it: one of two photos leaves the message; the last photo soft-deletes a blank message; a message with text stays.
+5. **`useBlocker` cannot be used here.** React Router 8.5.1 exports it, and it throws unless the app is inside a data router (`useDataRouterContext`). ADR 0035 uses declarative `BrowserRouter`. Leaving during an upload stays on `beforeunload` plus the confirm dialog for in-app links. The browser Back button is not blocked. Signed upload links still cannot be revoked before they expire (local tokens are 7200 seconds); that remains a follow-up.
+6. **A soft-deleted upload that was never posted was invisible to cleanup** and could hold the cap after 24 hours. Those rows are now orphans. Attached soft-deletes stay so an admin can restore them. ADR 0076.
+7. **Composer and viewer gaps against the handoff.** Remove is on every preview (`Remove photo N of M`) and aborts the upload. Send explains why it is disabled while a photo is uploading. The picker accepts `image/*` as well as HEIC. Delete asks for confirmation. Thumbnails and the viewer image set width and height.
+
+Local counts are in the reviewer run below. The builder's earlier counts stay in "Local full-stack run".
 
 ## Deviations from the plan and why
 
-- Concurrent cap coverage is the advisory lock held to the end of the transaction, plus a reservation that would cross 800 MB. A second pgTAP session cannot see the uncommitted fixture, so a true race is not in the SQL test.
+- Concurrent cap coverage started as the advisory lock plus a reservation that would cross 800 MB. The review adds `101_photo_cap_race.sql`, which runs the second reservation on another session and checks the wait and the `22023` failure.
 - `react-router` in this repo does not export `useBlocker`. Leaving during an upload uses `beforeunload` and the existing confirm dialog for in-app links.
-- Pending rows keep `provider = r2` until `mark_media_ready` sets `supabase`. The client insert trigger still forces `r2`, and the reserve path inserts as the function owner so it can keep that default until finish.
+- Pending rows used to keep `provider = r2` until finish. The review stores the configured provider on the reservation instead (ADR 0074). The client insert trigger still assigns `r2` and then rejects the insert, so that assignment is never saved.
 - The S3 module is untested against a real bucket.
+- Signed view responses cache with `Expires`, not `Cache-Control`. See ADR 0075.
+- `useBlocker` needs a data router, which this app does not use. See the review notes.
 - `realtime.send` adds a top-level broadcast `id` next to `table`, `operation`, and `record`. The record itself is only `id` and `space_id`.
 - Deleting the last photo on a blank message also soft-deletes the message, so the thread does not show an empty bubble.
 
@@ -52,6 +64,25 @@ pnpm test:e2e             # 162 passed on Chromium, WebKit, and iPhone 13, inclu
 ```
 
 `storage-api` was enabled. `MEDIA_PROVIDER=supabase` and `MEDIA_PUBLIC_BASE_URL=http://127.0.0.1:54321` were exported before start. Studio was not started (it would be port 54323).
+
+## Reviewer local run
+
+Same stack, after the review migration. CLI 3.1.0, Deno 2.9.8, storage-api v1.90.1, Postgres 17.
+
+```bash
+supabase test db          # 428 pgTAP tests passed
+cd supabase/functions && deno fmt --check && deno lint && deno check && deno test --allow-env
+                          # 26 Deno tests passed
+pnpm lint && pnpm typecheck && pnpm test
+                          # 29 Vitest tests passed
+pnpm --filter web build   # dist has the publishable key, not the service-role JWT
+supabase db lint --fail-on error
+supabase db advisors --type security --level warn --fail-on warn
+CI=true pnpm --filter web test:e2e
+                          # 162 passed (6.1m) on Chromium, WebKit, and iPhone 13, including axe
+```
+
+Attacked as Noa, Ari, Grandma, and the anon key: storage list, download, upload, remove, and createSignedUrl failed (an existing object still returned `NoSuchKey` to Noa). Ari cannot read Mom's space or Grandma's pending row, cannot reserve in Noa's space, and `media-view-urls` returned `{}` for that pending id. `mark_media_ready` is denied to Noa. `media-upload-url` without a user JWT and `media-cleanup` without its secret both returned 401. The function omits `Access-Control-Allow-Origin` for a foreign origin; local Kong still adds `*`. That is recorded in `docs/hosted-settings.md`.
 
 ## Follow-ups carried forward
 

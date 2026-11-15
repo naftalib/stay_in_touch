@@ -105,6 +105,9 @@ This index mirrors the old table so existing links to `docs/decisions.md` still 
 | Photos bucket created by migration | [0071](./decisions/0071-photos-bucket-migration.md) |
 | A blank message needs a photo | [0072](./decisions/0072-blank-message-needs-photo.md) |
 | Orphan job scheduled when Vault secrets exist | [0073](./decisions/0073-orphan-schedule-when-configured.md) |
+| Pending rows record the configured provider | [0074](./decisions/0074-pending-media-provider.md) |
+| Signed GET caching uses Expires | [0075](./decisions/0075-signed-get-expires.md) |
+| Unattached soft-deletes are orphans | [0076](./decisions/0076-unattached-soft-delete-orphans.md) |
 
 ## Future additions
 

@@ -14,6 +14,8 @@ Photo bytes are private. The thread and the Pics tab need thumbnails and a full-
 ## Consequences
 A removed member's next request returns nothing. A link already in another browser keeps working until it expires. Local observation: the signed GET returned `content-type: image/jpeg` and did not send a `Cache-Control` header, even though the PUT sent `max-age=31536000`.
 
+Follow-up (review, ADR 0075): the same signed GET does send `Expires` at the token's end. Browsers cache that URL until then. The stored `cacheControl` is not copied onto the signed response.
+
 ## Status
 Accepted
 
