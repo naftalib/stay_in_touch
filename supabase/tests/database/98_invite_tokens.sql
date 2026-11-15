@@ -49,9 +49,13 @@ select throws_ok(
 select test.login('mom@fixture.test');
 set local role authenticated;
 
+reset role;
 update public.invitations
 set last_sent_at = pg_catalog.now() - interval '2 minutes'
 where id = current_setting('test.invite_id')::uuid;
+
+select test.login('mom@fixture.test');
+set local role authenticated;
 
 select set_config(
   'test.token2',
@@ -82,6 +86,7 @@ select is_empty(
   'old token no longer previews'
 );
 
+reset role;
 update public.invitations
 set last_sent_at = pg_catalog.now() - interval '2 minutes'
 where id = current_setting('test.invite_id')::uuid;

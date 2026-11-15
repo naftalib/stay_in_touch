@@ -688,6 +688,11 @@ grant execute on function public.invitation_preview(text) to anon, authenticated
 grant execute on function public.accept_invitation(text) to authenticated, service_role;
 grant execute on function public.my_pending_invitations() to authenticated, service_role;
 
+revoke all on function private.base64url_encode(bytea) from public, anon, authenticated;
+revoke all on function private.invitation_token_hash(text) from public, anon, authenticated;
+revoke all on function private.finish_accept_invitation(uuid, uuid) from public, anon, authenticated;
+revoke all on function private.cleanup_orphan_invite_auth_users() from public, anon, authenticated;
+
 do $$
 begin
   perform cron.schedule(
