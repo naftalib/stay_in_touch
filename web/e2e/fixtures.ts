@@ -60,15 +60,22 @@ export async function signInWithPassword(page: import("@playwright/test").Page, 
   });
 }
 
+/** Aside on wide viewports; Spaces drawer dialog on narrow viewports. */
+function spacesDrawer(page: import("@playwright/test").Page) {
+  return page
+    .getByRole("dialog")
+    .filter({ has: page.getByRole("navigation", { name: "Spaces" }) });
+}
+
 /** Opens the Spaces drawer on narrow viewports. A second call is a no-op while the drawer is already open; the opener sits behind the modal and is inert. */
 export async function ensureSpacesNavOpen(page: import("@playwright/test").Page) {
-  const nav = page.getByRole("navigation", { name: "Spaces" });
+  const nav = spacesNav(page);
   if (await nav.isVisible()) return;
 
   const drawerOpener = page.getByRole("button", { name: "Spaces" });
   if (await drawerOpener.isVisible()) {
     await drawerOpener.click();
-    const dialog = page.getByRole("dialog");
+    const dialog = spacesDrawer(page);
     await expect(dialog).toBeVisible();
     const drawerNav = dialog.getByRole("navigation", { name: "Spaces" });
     await expect(drawerNav).toBeVisible();
@@ -77,12 +84,15 @@ export async function ensureSpacesNavOpen(page: import("@playwright/test").Page)
 }
 
 export function spacesNav(page: import("@playwright/test").Page) {
-  return page.locator('aside, [role="dialog"]').getByRole("navigation", { name: "Spaces" });
+  return page
+    .locator("aside")
+    .getByRole("navigation", { name: "Spaces" })
+    .or(spacesDrawer(page).getByRole("navigation", { name: "Spaces" }));
 }
 
 /** Side nav shell (footer with sign-out) for the current viewport. */
 export function spacesShell(page: import("@playwright/test").Page) {
-  return page.locator('aside, [role="dialog"]');
+  return page.locator("aside").or(spacesDrawer(page));
 }
 
 export async function signOutFromApp(page: import("@playwright/test").Page) {

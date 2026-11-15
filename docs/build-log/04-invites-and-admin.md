@@ -128,7 +128,7 @@ Rebased the review onto the CI fix rounds above. Invite users are created alread
 
 ## CI fix round 11 (Nov 15)
 
-- Run [43740864806](https://github.com/naftalib/stay_in_touch/actions/runs/43740864806) on review commit `c172b2f`: web ~20s, functions ~11s, db ~85s; e2e failed on mobile only (`child alias sets a password and can switch back`) — drawer footer “Switch account” sat below the fold without `scrollIntoViewIfNeeded`. Added `switchAccountFromApp` e2e helper and flex shrink on the Spaces drawer body so the footer stays reachable on narrow viewports.
+- Run [43740864806](https://github.com/naftalib/stay_in_touch/actions/runs/43740864806) on review commit `c172b2f`: web ~20s, functions ~11s, db ~85s; e2e failed on mobile only (`child alias sets a password and can switch back`) — drawer footer “Switch account” not actionable. Added `switchAccountFromApp`, flex shrink on the Spaces drawer body, and scoped `spacesShell` / `ensureSpacesNavOpen` to the aside or Spaces drawer (not every `[role="dialog"]`). Re-run [43742532230](https://github.com/naftalib/stay_in_touch/actions/runs/43742532230) on `307eb2d` still failed mobile until the locator scope fix.
 
 ## Follow-ups carried forward
 
