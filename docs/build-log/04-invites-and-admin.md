@@ -61,6 +61,10 @@ Pending Grok 4.7 review.
 
 - E2E `invite-send` goes through Kong into the edge-runtime container: loopback `MAILPIT_URL` and host-only `SUPABASE_URL` checks failed. Default Mailpit to `http://inbucket:8025` on the Docker network; CI exports edge secrets before `supabase start`.
 
+## CI fix round 6 (Nov 15)
+
+- E2E job [43733686550](https://github.com/naftalib/stay_in_touch/actions/runs/43733686550) failed before Playwright: `supabase start` could not bind Mailpit host port 54324 (`address already in use`). E2E `supabase start` now stops any prior stack and retries up to three times.
+
 ## Follow-ups carried forward
 
 - Expand Playwright to full spec §10 list and axe matrix on new screens.

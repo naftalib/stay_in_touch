@@ -45,7 +45,16 @@ jobs:
           EMAIL_TRANSPORT: mailpit
           APP_URL: http://127.0.0.1:5173
           EMAIL_FROM: Stay In Touch <no-reply@example.test>
-        run: supabase start -x studio,storage-api,imgproxy,logflare,vector,supavisor
+        run: |
+          for attempt in 1 2 3; do
+            supabase stop --no-backup || true
+            if supabase start -x studio,storage-api,imgproxy,logflare,vector,supavisor; then
+              exit 0
+            fi
+            echo "supabase start failed (attempt ${attempt}), retrying..."
+            sleep 3
+          done
+          exit 1
       - name: Serve Edge Functions
         run: |
           supabase functions serve --env-file supabase/functions/.env.example &
