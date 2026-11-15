@@ -3,7 +3,7 @@ select set_config('search_path', 'public, extensions', true);
 
 \ir _fixtures.sql.inc
 
-select plan(18);
+select plan(12);
 
 select test.login('mom@fixture.test');
 set local role authenticated;
