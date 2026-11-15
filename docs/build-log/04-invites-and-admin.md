@@ -51,6 +51,12 @@ Pending Grok 4.7 review.
 - **Mailpit:** `invite-send` used `inbucket:8025`; local stack exposes Mailpit at `127.0.0.1:54324` (`MAILPIT_URL` in `.env.example`).
 - Dropped `afterAll` `db reset` in `invites-admin.spec.ts` (global setup already resets; mid-suite reset broke PostgREST on later projects).
 
+## CI fix round 4 (Nov 15)
+
+- Mailpit `/api/v1/send` expects `{ From: { Email }, To: [{ Email }] }` (not Inbucket string form).
+- Per-project invite email addresses; parse Mailpit message `Text`/`HTML`.
+- `remove_member` E2E moved to `z-removed-member.spec.ts` (runs last, resets DB after) so seed `noa` is not removed mid-suite.
+
 ## Follow-ups carried forward
 
 - Expand Playwright to full spec §10 list and axe matrix on new screens.

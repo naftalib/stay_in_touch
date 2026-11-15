@@ -30,9 +30,12 @@ async function sendViaMailpit(input: SendEmailInput): Promise<void> {
     throw new Error("Mailpit transport is only allowed for local Supabase");
   }
   const from = Deno.env.get("EMAIL_FROM") ?? "Stay In Touch <no-reply@example.test>";
+  const fromMatch = from.match(/^(.+?)\s*<([^>]+)>$/);
+  const fromEmail = fromMatch?.[2] ?? from;
+  const fromName = fromMatch?.[1]?.trim();
   const body = {
-    From: from,
-    To: [input.to],
+    From: { Email: fromEmail, ...(fromName ? { Name: fromName } : {}) },
+    To: [{ Email: input.to }],
     Subject: input.subject,
     HTML: input.html,
     Text: input.text,
