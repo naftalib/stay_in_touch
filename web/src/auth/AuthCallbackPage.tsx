@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate } from "react-router";
+import { Link, Navigate, useSearchParams } from "react-router";
 import { useAuth } from "./AuthContext.tsx";
+import { safeReturnPath } from "./safeReturnPath.ts";
 import styles from "./AuthCallbackPage.module.css";
 
 const EXPIRED =
@@ -16,8 +17,10 @@ function linkError(): string | null {
 
 export default function AuthCallbackPage() {
   const { session } = useAuth();
+  const [searchParams] = useSearchParams();
   const immediateError = linkError();
   const [timedOut, setTimedOut] = useState(false);
+  const next = safeReturnPath(searchParams.get("next") ?? undefined);
 
   useEffect(() => {
     if (immediateError) return;
@@ -28,7 +31,7 @@ export default function AuthCallbackPage() {
   }, [immediateError]);
 
   if (session) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={next} replace />;
   }
 
   const error = immediateError ?? (timedOut ? EXPIRED : null);

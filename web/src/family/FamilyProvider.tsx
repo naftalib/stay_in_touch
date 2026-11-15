@@ -5,6 +5,7 @@ import { useMemberships } from "./useMemberships.ts";
 import { useSpaces } from "./useSpaces.ts";
 import SpaceUnavailable from "../spaces/SpaceUnavailable.tsx";
 import type { MembershipContext } from "./types.ts";
+import { PendingInvitesPanel } from "./PendingInvitesPanel.tsx";
 import styles from "./FamilyProvider.module.css";
 
 const FamilyContext = createContext<MembershipContext | null>(null);
@@ -130,6 +131,7 @@ export function FamilyPicker({ children }: { children?: ReactNode }) {
       <main className={styles.empty}>
         <h1>No family yet</h1>
         <p>When a parent adds you, your spaces will show up here.</p>
+        <PendingInvitesPanel />
       </main>
     )
   );

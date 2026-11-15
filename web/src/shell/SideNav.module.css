@@ -91,6 +91,41 @@
   font-style: italic;
 }
 
+.adminLinks {
+  padding: var(--space-4);
+  border-block-start: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.adminHeading {
+  margin: 0;
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.adminLink {
+  min-block-size: var(--size-touch-min);
+  display: flex;
+  align-items: center;
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.adminLink:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+}
+
+.switchAccount {
+  font-size: 0.95em;
+  color: var(--color-link);
+}
+
 .footer {
   padding: var(--space-4);
   border-block-start: 1px solid var(--color-border);

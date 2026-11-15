@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router'
+import { Link, NavLink } from 'react-router'
 import { Button } from 'react-aria-components'
 import type { NavItem } from './buildNav.ts'
 import TextSizeControl from '../settings/TextSizeControl.tsx'
@@ -11,6 +11,7 @@ type SideNavProps = {
   onNavigate?: () => void
   onSignOut: () => void
   userLabel?: string
+  showAdminLinks?: boolean
 }
 
 export default function SideNav({
@@ -20,6 +21,7 @@ export default function SideNav({
   onNavigate,
   onSignOut,
   userLabel,
+  showAdminLinks,
 }: SideNavProps) {
   return (
     <div className={styles.wrap}>
@@ -86,11 +88,26 @@ export default function SideNav({
         </ul>
       </nav>
 
+      {showAdminLinks ? (
+        <div className={styles.adminLinks}>
+          <p className={styles.adminHeading}>Family</p>
+          <Link className={styles.adminLink} to={`/f/${familyId}/members`} onClick={onNavigate}>
+            Members
+          </Link>
+          <Link className={styles.adminLink} to={`/f/${familyId}/spaces`} onClick={onNavigate}>
+            Spaces
+          </Link>
+        </div>
+      ) : null}
+
       <footer className={styles.footer}>
         {userLabel ? (
           <p className={styles.signedInAs}>Signed in as {userLabel}</p>
         ) : null}
         <TextSizeControl />
+        <Link className={styles.switchAccount} to="/sign-in?signedOut=1">
+          Switch account
+        </Link>
         <Button className={styles.signOut} onPress={onSignOut}>
           Sign out
         </Button>

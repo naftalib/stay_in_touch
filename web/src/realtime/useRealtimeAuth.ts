@@ -11,4 +11,16 @@ export function useRealtimeAuth(): void {
     if (!token) return
     void getSupabase().realtime.setAuth(token)
   }, [session?.access_token])
+
+  useEffect(() => {
+    const supabase = getSupabase()
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'TOKEN_REFRESHED') {
+        void supabase.removeAllChannels()
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 }

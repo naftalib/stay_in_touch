@@ -12,6 +12,8 @@ import SpaceTabs from "./SpaceTabs.tsx";
 import ConnectionBanner from "./ConnectionBanner.tsx";
 import { useOnlineStatus } from "./useOnlineStatus.ts";
 import { useRealtimeConnection } from "./useRealtimeConnection.ts";
+import { useRealtimeAuth } from "../realtime/useRealtimeAuth.ts";
+import { PendingInvitesPanel } from "../family/PendingInvitesPanel.tsx";
 import styles from "./AppShell.module.css";
 
 const DRAWER_BREAKPOINT = 900;
@@ -31,6 +33,7 @@ export default function AppShell() {
   const unreadQuery = useUnreadCounts(activeFamilyId);
   const { offline } = useOnlineStatus();
   const { paused } = useRealtimeConnection();
+  useRealtimeAuth();
 
   const [narrow, setNarrow] = useState(
     () =>
@@ -109,6 +112,7 @@ export default function AppShell() {
                           onNavigate={close}
                           onSignOut={handleSignOut}
                           userLabel={displayName}
+                          showAdminLinks={role === "admin"}
                         />
                       </>
                     )}
@@ -125,6 +129,7 @@ export default function AppShell() {
       </header>
 
       <ConnectionBanner offline={offline} paused={paused && !offline} />
+      <PendingInvitesPanel compact />
 
       <div className={styles.body}>
         {!narrow ? (
@@ -135,6 +140,7 @@ export default function AppShell() {
               activeSpaceId={activeSpaceId}
               onSignOut={handleSignOut}
               userLabel={displayName}
+              showAdminLinks={role === "admin"}
             />
           </aside>
         ) : null}

@@ -38,8 +38,12 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 3.1.0
-      - name: Start Supabase (auth, API, Realtime, Mailpit)
-        run: supabase start -x studio,storage-api,imgproxy,edge-runtime,logflare,vector,supavisor
+      - name: Start Supabase (auth, API, Realtime, Mailpit, Edge Runtime)
+        run: supabase start -x studio,storage-api,imgproxy,logflare,vector,supavisor
+      - name: Serve Edge Functions
+        run: |
+          supabase functions serve --env-file supabase/functions/.env.example &
+          sleep 5
       - name: Reset database
         run: supabase db reset
       - name: Check generated types drift
@@ -68,6 +72,21 @@ jobs:
           name: playwright-report
           path: web/playwright-report/
           if-no-files-found: ignore
+
+  functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.8
+      - name: Deno fmt, lint, check, test
+        working-directory: supabase/functions
+        run: |
+          deno fmt --check
+          deno lint
+          deno check **/*.ts
+          deno test --allow-env
 
   db:
     runs-on: ubuntu-latest

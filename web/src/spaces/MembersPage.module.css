@@ -1,8 +1,107 @@
 .page {
-  padding: var(--space-6);
-  max-inline-size: 40rem;
+  padding: var(--space-4);
+  max-width: 44rem;
 }
 
-.page h1 {
-  margin-block-end: var(--space-3);
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.list {
+  list-style: none;
+  margin: 0 0 var(--space-6);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.meta {
+  display: block;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  margin-top: var(--space-1);
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.primary {
+  min-height: 3rem;
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  border-radius: var(--radius-md);
+}
+
+.status {
+  color: var(--color-success, #0a6640);
+}
+
+.error {
+  color: var(--color-danger);
+}
+
+.removed {
+  margin-top: var(--space-6);
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  max-width: 28rem;
+  width: 100%;
+  padding: var(--space-5);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.hint {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.inviteForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }

@@ -184,6 +184,8 @@ export type Database = {
           role: Database["public"]["Enums"]["family_role"];
           status: Database["public"]["Enums"]["invitation_status"];
           updated_at: string;
+          last_sent_at: string | null;
+          send_count: number;
         };
         ComputedFields: never;
         Insert: {
@@ -199,6 +201,8 @@ export type Database = {
           role: Database["public"]["Enums"]["family_role"];
           status?: Database["public"]["Enums"]["invitation_status"];
           updated_at?: string;
+          last_sent_at?: string | null;
+          send_count?: number;
         };
         Update: {
           accepted_user_id?: string | null;
@@ -213,6 +217,8 @@ export type Database = {
           role?: Database["public"]["Enums"]["family_role"];
           status?: Database["public"]["Enums"]["invitation_status"];
           updated_at?: string;
+          last_sent_at?: string | null;
+          send_count?: number;
         };
         Relationships: [
           {
@@ -707,8 +713,47 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      accept_invitation: {
+        Args: { p_token: string };
+        Returns: { family_id: string; member_id: string }[];
+      };
       accept_invite: { Args: { p_invitation_id: string }; Returns: string };
       archive_space: { Args: { p_space_id: string }; Returns: undefined };
+      invitation_preview: {
+        Args: { p_token: string };
+        Returns: {
+          status: string;
+          email: string;
+          family_name: string;
+          inviter_name: string;
+          role: Database["public"]["Enums"]["family_role"];
+          label: string;
+          expires_at: string;
+        }[];
+      };
+      issue_invitation_token: {
+        Args: { p_invitation_id: string };
+        Returns: {
+          token: string;
+          email: string;
+          role: Database["public"]["Enums"]["family_role"];
+          label: string;
+          family_name: string;
+          inviter_name: string;
+          expires_at: string;
+        }[];
+      };
+      my_pending_invitations: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          id: string;
+          family_name: string;
+          inviter_name: string;
+          role: Database["public"]["Enums"]["family_role"];
+          label: string;
+          expires_at: string;
+        }[];
+      };
       change_member_role: {
         Args: { p_member_id: string; p_role: Database["public"]["Enums"]["family_role"] };
         Returns: undefined;

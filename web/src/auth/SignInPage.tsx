@@ -16,6 +16,7 @@ import { getSupabase } from "../lib/supabase.ts";
 import { mapError, type AppError } from "../lib/errors.ts";
 import { useAuth } from "./AuthContext.tsx";
 import { safeReturnPath } from "./safeReturnPath.ts";
+import { loadRecentAccounts, rememberRecentAccount } from "./recentAccounts.ts";
 import styles from "./SignInPage.module.css";
 
 type LocationState = {
@@ -36,7 +37,9 @@ export default function SignInPage() {
     new URLSearchParams(location.search).get("signedOut") === "1" ||
     sessionStorage.getItem("stay-signed-out") === "1";
   const [tab, setTab] = useState<"password" | "email">("password");
-  const [email, setEmail] = useState("");
+  const searchEmail = new URLSearchParams(location.search).get("email") ?? "";
+  const [email, setEmail] = useState(searchEmail);
+  const recent = loadRecentAccounts();
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [code, setCode] = useState("");
@@ -66,6 +69,7 @@ export default function SignInPage() {
         });
         return;
       }
+      rememberRecentAccount({ email: trimmed, displayName: trimmed });
     } catch (caught) {
       setError(mapError(caught));
     } finally {
@@ -138,6 +142,25 @@ export default function SignInPage() {
     <main className={styles.page}>
       <div className={styles.card}>
         <h1 className={styles.title}>Stay In Touch</h1>
+
+        {recent.length > 0 ? (
+          <div className={styles.recent}>
+            <p className={styles.recentLabel}>Recent accounts</p>
+            <ul className={styles.recentList}>
+              {recent.map((row) => (
+                <li key={row.email}>
+                  <Button
+                    type="button"
+                    className={styles.recentButton}
+                    onPress={() => setEmail(row.email)}
+                  >
+                    {row.displayName || row.email}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         {signedOut ? (
           <p className={styles.notice} role="status">

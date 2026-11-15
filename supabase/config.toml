@@ -401,8 +401,11 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
-# [edge_runtime.secrets]
-# secret_key = "env(SECRET_VALUE)"
+[edge_runtime.secrets]
+EMAIL_TRANSPORT = "env(EMAIL_TRANSPORT)"
+APP_URL = "env(APP_URL)"
+EMAIL_FROM = "env(EMAIL_FROM)"
+RESEND_API_KEY = "env(RESEND_API_KEY)"
 
 [analytics]
 enabled = true
