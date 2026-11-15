@@ -1,18 +1,8 @@
-import {
-  test,
-  expect,
-  signInWithPassword,
-  SEED_USERS,
-  FAMILY_ID,
-  resetDatabase,
-} from "./fixtures.ts";
+import { test, expect, signInWithPassword, SEED_USERS, FAMILY_ID } from "./fixtures.ts";
 import { latestEmailTo, extractOtp } from "./mailpit.ts";
 import { accessToken, rpc } from "./api.ts";
 
 test.describe("Invites and admin", () => {
-  test.afterAll(() => {
-    resetDatabase();
-  });
   test("admin members page is hidden from children", async ({ page }) => {
     await signInWithPassword(page, SEED_USERS.noa);
     await page.goto(`/f/${FAMILY_ID}/members`);

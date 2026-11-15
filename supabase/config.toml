@@ -403,6 +403,7 @@ deno_version = 2
 
 [edge_runtime.secrets]
 EMAIL_TRANSPORT = "env(EMAIL_TRANSPORT)"
+MAILPIT_URL = "env(MAILPIT_URL)"
 APP_URL = "env(APP_URL)"
 EMAIL_FROM = "env(EMAIL_FROM)"
 RESEND_API_KEY = "env(RESEND_API_KEY)"

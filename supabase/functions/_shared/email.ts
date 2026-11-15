@@ -19,6 +19,12 @@ function isLocalSupabaseUrl(): boolean {
   return url.includes("127.0.0.1") || url.includes("localhost");
 }
 
+function mailpitBaseUrl(): string {
+  const configured = Deno.env.get("MAILPIT_URL");
+  if (configured) return configured.replace(/\/$/, "");
+  return "http://127.0.0.1:54324";
+}
+
 async function sendViaMailpit(input: SendEmailInput): Promise<void> {
   if (!isLocalSupabaseUrl()) {
     throw new Error("Mailpit transport is only allowed for local Supabase");
@@ -31,7 +37,7 @@ async function sendViaMailpit(input: SendEmailInput): Promise<void> {
     HTML: input.html,
     Text: input.text,
   };
-  const res = await fetch("http://inbucket:8025/api/v1/send", {
+  const res = await fetch(`${mailpitBaseUrl()}/api/v1/send`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
