@@ -40,7 +40,10 @@ describe("composer photo state", () => {
     expect(sendGate("", []).enabled).toBe(false);
     expect(sendGate("Hi", []).enabled).toBe(true);
     expect(sendGate("", [draft("ready")]).enabled).toBe(true);
-    expect(sendGate("Hi", [draft("uploading")]).enabled).toBe(false);
+    expect(sendGate("Hi", [draft("uploading")])).toEqual({
+      enabled: false,
+      reason: "Wait until each photo finishes uploading.",
+    });
     expect(sendGate("", [draft("failed")]).enabled).toBe(false);
     expect(sendGate("Hi", [draft("failed")]).enabled).toBe(true);
   });

@@ -69,7 +69,13 @@ export default function PicsTab({ spaceId, memberId, role }: PicsTabProps) {
                 {photo.deletedAt ? (
                   <span>Deleted photo</span>
                 ) : thumb ? (
-                  <img className={styles.thumb} src={thumb} alt="" />
+                  <img
+                    className={styles.thumb}
+                    src={thumb}
+                    alt=""
+                    width={photo.width ?? undefined}
+                    height={photo.height ?? undefined}
+                  />
                 ) : (
                   <span>{alt}</span>
                 )}

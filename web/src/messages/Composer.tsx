@@ -51,6 +51,8 @@ export default function Composer({
   const [error, setError] = useState<AppError | null>(null);
   const [leaveTo, setLeaveTo] = useState<string | null>(null);
   const filesRef = useRef(new Map<string, File>());
+  const cancelledRef = useRef(new Set<string>());
+  const abortRef = useRef(new Map<string, AbortController>());
   const effectiveDisabled = disabled || offline;
   const gate = sendGate(body, photos);
   const busy = photos.some((photo) => photo.phase === "preparing" || photo.phase === "uploading");
@@ -87,10 +89,26 @@ export default function Composer({
     );
   }
 
+  function removePhoto(localId: string) {
+    cancelledRef.current.add(localId);
+    abortRef.current.get(localId)?.abort();
+    abortRef.current.delete(localId);
+    const preview = photos.find((photo) => photo.localId === localId)?.previewUrl;
+    if (preview) URL.revokeObjectURL(preview);
+    filesRef.current.delete(localId);
+    setPhotos((current) => current.filter((item) => item.localId !== localId));
+  }
+
   async function uploadOne(localId: string, file: File) {
     patch(localId, { phase: "preparing", progress: 0, error: undefined });
+    const controller = new AbortController();
+    abortRef.current.set(localId, controller);
     try {
       const prepared = await preparePhoto(file);
+      if (cancelledRef.current.has(localId)) {
+        URL.revokeObjectURL(prepared.previewUrl);
+        return;
+      }
       patch(localId, {
         previewUrl: prepared.previewUrl,
         width: prepared.width,
@@ -106,18 +124,30 @@ export default function Composer({
         width: prepared.width,
         height: prepared.height,
       });
+      if (cancelledRef.current.has(localId)) return;
       patch(localId, { mediaId: reserved.media_id });
-      await putBlob(reserved.upload, prepared.full, (ratio) =>
-        patch(localId, { progress: ratio * 0.7 }),
+      await putBlob(
+        reserved.upload,
+        prepared.full,
+        (ratio) => patch(localId, { progress: ratio * 0.7 }),
+        controller.signal,
       );
-      await putBlob(reserved.thumb, prepared.thumb, (ratio) =>
-        patch(localId, { progress: 0.7 + ratio * 0.25 }),
+      await putBlob(
+        reserved.thumb,
+        prepared.thumb,
+        (ratio) => patch(localId, { progress: 0.7 + ratio * 0.25 }),
+        controller.signal,
       );
+      if (cancelledRef.current.has(localId)) return;
       const status = await finishUpload(reserved.media_id);
+      if (cancelledRef.current.has(localId)) return;
       if (status !== "ready") throw new Error("The photo could not be saved. Try again.");
       patch(localId, { phase: "ready", progress: 1 });
     } catch (caught) {
+      if (cancelledRef.current.has(localId)) return;
       patch(localId, { phase: "failed", error: mapError(caught).title });
+    } finally {
+      abortRef.current.delete(localId);
     }
   }
 
@@ -201,14 +231,7 @@ export default function Composer({
       {spaceId ? (
         <div className={styles.toolbar}>
           <FileTrigger
-            acceptedFileTypes={[
-              "image/jpeg",
-              "image/png",
-              "image/heic",
-              "image/heif",
-              ".heic",
-              ".heif",
-            ]}
+            acceptedFileTypes={["image/*", "image/heic", "image/heif", ".heic", ".heif"]}
             allowsMultiple
             onSelect={(list) => {
               if (list) void addFiles([...list]);
@@ -222,7 +245,7 @@ export default function Composer({
       ) : null}
       {photos.length > 0 ? (
         <ul className={styles.previews}>
-          {photos.map((photo) => (
+          {photos.map((photo, index) => (
             <li key={photo.localId} className={styles.preview}>
               {photo.previewUrl ? (
                 <img src={photo.previewUrl} alt={photo.caption.trim() || "Photo preview"} />
@@ -253,22 +276,18 @@ export default function Composer({
                   >
                     Retry
                   </Button>
-                  <Button
-                    type="button"
-                    className={styles.retry}
-                    onPress={() => {
-                      filesRef.current.delete(photo.localId);
-                      setPhotos((current) =>
-                        current.filter((item) => item.localId !== photo.localId),
-                      );
-                    }}
-                  >
-                    Remove
-                  </Button>
                 </p>
               ) : null}
+              <Button
+                type="button"
+                className={styles.retry}
+                aria-label={`Remove photo ${index + 1} of ${photos.length}`}
+                onPress={() => removePhoto(photo.localId)}
+              >
+                Remove
+              </Button>
               <label>
-                Caption
+                Describe this photo (optional)
                 <input
                   value={photo.caption}
                   maxLength={200}
@@ -309,7 +328,17 @@ export default function Composer({
             {MAX_LENGTH - body.length} characters left
           </p>
         ) : null}
-        <Button type="submit" className={styles.button} isDisabled={submitting || !gate.enabled}>
+        {gate.reason ? (
+          <p className={styles.counter} id="photo-send-reason" role="status">
+            {gate.reason}
+          </p>
+        ) : null}
+        <Button
+          type="submit"
+          className={styles.button}
+          isDisabled={submitting || !gate.enabled}
+          aria-describedby={gate.reason ? "photo-send-reason" : undefined}
+        >
           Send
         </Button>
       </Form>

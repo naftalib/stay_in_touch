@@ -24,10 +24,12 @@ function functionsUrl(name: string): string {
 async function authHeaders(): Promise<Record<string, string>> {
   const { data } = await getSupabase().auth.getSession();
   const token = data.session?.access_token;
+  const apikey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!token) throw new Error("Not signed in");
+  if (!apikey) throw new Error("VITE_SUPABASE_PUBLISHABLE_KEY is not set");
   return {
     authorization: `Bearer ${token}`,
-    apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    apikey,
     "content-type": "application/json",
   };
 }
@@ -68,9 +70,18 @@ export function putBlob(
   target: SignedTarget,
   body: Blob,
   onProgress: (ratio: number) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error("Upload cancelled"));
+      return;
+    }
     const xhr = new XMLHttpRequest();
+    const onAbort = () => {
+      xhr.abort();
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
     xhr.open(target.method, target.url);
     for (const [key, value] of Object.entries(target.headers)) {
       if (SKIP_HEADERS.has(key.toLowerCase())) continue;
@@ -84,6 +95,7 @@ export function putBlob(
       else reject(new Error(`Upload failed (${xhr.status})`));
     };
     xhr.onerror = () => reject(new Error("Upload failed"));
+    xhr.onabort = () => reject(new Error("Upload cancelled"));
     xhr.send(body);
   });
 }

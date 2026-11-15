@@ -47,7 +47,13 @@ export default function PhotoGrid({ photos, spaceId, memberId, role }: PhotoGrid
                 {photo.deletedAt ? (
                   <span className={styles.deleted}>Deleted photo</span>
                 ) : thumb ? (
-                  <img className={styles.thumb} src={thumb} alt="" />
+                  <img
+                    className={styles.thumb}
+                    src={thumb}
+                    alt=""
+                    width={photo.width ?? undefined}
+                    height={photo.height ?? undefined}
+                  />
                 ) : (
                   <span className={styles.deleted}>{alt}</span>
                 )}

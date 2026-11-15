@@ -127,7 +127,7 @@ test("grandma posts photos in Noa's space and Noa sees one unread item", async (
   await expect(page.getByRole("progressbar").first()).toBeVisible();
   releaseUpload();
   await expect(page.getByRole("progressbar")).toHaveCount(0, { timeout: 30_000 });
-  await page.getByLabel("Caption").first().fill(caption);
+  await page.getByLabel("Describe this photo (optional)").first().fill(caption);
   await page.getByRole("textbox", { name: "Message" }).fill(caption);
   await page.getByRole("button", { name: "Send" }).click();
   const article = page.getByRole("article", { name: new RegExp(caption) });
@@ -164,7 +164,7 @@ test("a photo-only post works and a blank text post does not", async ({ page }) 
   await expect(page.getByRole("button", { name: "Send" })).toBeDisabled();
   await page.locator('input[type="file"]').setInputFiles(jpeg);
   await expect(page.getByRole("button", { name: "Send" })).toBeEnabled({ timeout: 30_000 });
-  await page.getByLabel("Caption").fill(`Only ${Date.now()}`);
+  await page.getByLabel("Describe this photo (optional)").fill(`Only ${Date.now()}`);
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByRole("button", { name: /Only / })).toBeVisible();
 });
@@ -347,13 +347,14 @@ test("grandma can delete her photo, Noa cannot, and Mom can restore it", async (
   await page.goto(`/f/${FAMILY_ID}/s/${SPACES.noa}/messages`);
   await page.locator('input[type="file"]').setInputFiles(file);
   await expect(page.getByRole("button", { name: "Send" })).toBeEnabled({ timeout: 30_000 });
-  await page.getByLabel("Caption").fill(caption);
+  await page.getByLabel("Describe this photo (optional)").fill(caption);
   await page.getByRole("textbox", { name: "Message" }).fill(`Keep ${caption}`);
   await page.getByRole("button", { name: "Send" }).click();
   const thumb = page.getByRole("button", { name: caption });
   await expect(thumb).toBeVisible();
   await thumb.click();
   await page.getByRole("button", { name: "Delete photo" }).click();
+  await page.getByRole("button", { name: "Delete this photo" }).click();
   await expect(page.getByText("This photo was deleted.")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Deleted photo" })).toBeVisible();

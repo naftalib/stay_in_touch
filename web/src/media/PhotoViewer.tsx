@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, Dialog, Heading, Modal, ModalOverlay } from "react-aria-components";
 import type { FamilyRole } from "../lib/database.helpers.ts";
 import { getSupabase } from "../lib/supabase.ts";
+import ConfirmDialog from "../ui/ConfirmDialog.tsx";
 import { photoAlt } from "./altText.ts";
 import type { ThreadPhoto } from "./types.ts";
 import styles from "./PhotoViewer.module.css";
@@ -33,6 +34,7 @@ export default function PhotoViewer({
     ),
   );
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const photo = photos[index];
 
   useEffect(() => {
@@ -70,79 +72,98 @@ export default function PhotoViewer({
   }
 
   return (
-    <ModalOverlay
-      isOpen
-      isDismissable
-      className={styles.overlay}
-      onOpenChange={(open) => !open && onClose()}
-    >
-      <Modal className={styles.modal}>
-        <Dialog className={styles.dialog} aria-label="Photo">
-          <Heading slot="title" className="sr-only">
-            Photo
-          </Heading>
-          <div
-            className={styles.stage}
-            onPointerDown={(event) => {
-              const startX = event.clientX;
-              event.currentTarget.setPointerCapture(event.pointerId);
-              event.currentTarget.dataset.startX = String(startX);
-            }}
-            onPointerUp={(event) => {
-              const startX = Number(event.currentTarget.dataset.startX ?? event.clientX);
-              const delta = event.clientX - startX;
-              if (delta > 48) setIndex((current) => Math.max(0, current - 1));
-              if (delta < -48) setIndex((current) => Math.min(photos.length - 1, current + 1));
-            }}
-          >
-            {photo.deletedAt ? (
-              <p className={styles.deleted}>This photo was deleted.</p>
-            ) : links[photo.id]?.full ? (
-              <img
-                className={styles.full}
-                src={links[photo.id]?.full}
-                alt={photoAlt(photo.caption, photo.uploaderLabel, dateLabel)}
-              />
-            ) : (
-              <p role="status">Loading photo…</p>
-            )}
-          </div>
-          <div className={styles.actions}>
-            <Button
-              className={styles.button}
-              isDisabled={index === 0}
-              onPress={() => setIndex((current) => current - 1)}
+    <>
+      <ModalOverlay
+        isOpen
+        isDismissable
+        className={styles.overlay}
+        onOpenChange={(open) => !open && onClose()}
+      >
+        <Modal className={styles.modal}>
+          <Dialog className={styles.dialog} aria-label="Photo">
+            <Heading slot="title" className="sr-only">
+              Photo
+            </Heading>
+            <div
+              className={styles.stage}
+              onPointerDown={(event) => {
+                const startX = event.clientX;
+                event.currentTarget.setPointerCapture(event.pointerId);
+                event.currentTarget.dataset.startX = String(startX);
+              }}
+              onPointerUp={(event) => {
+                const startX = Number(event.currentTarget.dataset.startX ?? event.clientX);
+                const delta = event.clientX - startX;
+                if (delta > 48) setIndex((current) => Math.max(0, current - 1));
+                if (delta < -48) setIndex((current) => Math.min(photos.length - 1, current + 1));
+              }}
             >
-              Previous
-            </Button>
-            <Button
-              className={styles.button}
-              isDisabled={index >= photos.length - 1}
-              onPress={() => setIndex((current) => current + 1)}
-            >
-              Next
-            </Button>
-            {canDelete ? (
-              <Button className={styles.button} onPress={() => void changeDeleted(true)}>
-                Delete photo
+              {photo.deletedAt ? (
+                <p className={styles.deleted}>This photo was deleted.</p>
+              ) : links[photo.id]?.full ? (
+                <img
+                  className={styles.full}
+                  src={links[photo.id]?.full}
+                  width={photo.width ?? undefined}
+                  height={photo.height ?? undefined}
+                  alt={photoAlt(photo.caption, photo.uploaderLabel, dateLabel)}
+                />
+              ) : (
+                <p role="status">Loading photo…</p>
+              )}
+            </div>
+            <div className={styles.actions}>
+              <Button
+                className={styles.button}
+                isDisabled={index === 0}
+                onPress={() => setIndex((current) => current - 1)}
+              >
+                Previous
               </Button>
-            ) : null}
-            {canRestore ? (
-              <Button className={styles.button} onPress={() => void changeDeleted(false)}>
-                Restore photo
+              <Button
+                className={styles.button}
+                isDisabled={index >= photos.length - 1}
+                onPress={() => setIndex((current) => current + 1)}
+              >
+                Next
               </Button>
+              {canDelete ? (
+                <Button className={styles.button} onPress={() => setConfirmDelete(true)}>
+                  Delete photo
+                </Button>
+              ) : null}
+              {canRestore ? (
+                <Button className={styles.button} onPress={() => void changeDeleted(false)}>
+                  Restore photo
+                </Button>
+              ) : null}
+              <Button className={styles.button} onPress={onClose}>
+                Close
+              </Button>
+            </div>
+            {error ? (
+              <p className={styles.error} role="alert">
+                {error}
+              </p>
             ) : null}
-            <Button className={styles.button} onPress={onClose}>
-              Close
-            </Button>
-          </div>
-          {error ? (
-            <p className={styles.error} role="alert">
-              {error}
-            </p>
-          ) : null}
-        </Dialog>
-      </Modal>
-    </ModalOverlay>
+          </Dialog>
+        </Modal>
+      </ModalOverlay>
+      <ConfirmDialog
+        request={
+          confirmDelete
+            ? {
+                title: "Delete this photo?",
+                body: "The family will no longer see it. An admin can restore it.",
+                confirmLabel: "Delete this photo",
+              }
+            : null
+        }
+        onClose={(confirmed) => {
+          setConfirmDelete(false);
+          if (confirmed) void changeDeleted(true);
+        }}
+      />
+    </>
   );
 }
