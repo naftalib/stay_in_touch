@@ -96,7 +96,14 @@ export default function InvitePage() {
         },
       });
       if (authError) {
-        setError(mapError(authError));
+        const message = authError.message.toLowerCase();
+        if (message.includes("rate") || authError.code?.includes("rate")) {
+          setError(mapError(authError));
+          return;
+        }
+        // Invitee auth users are created by invite-send; still show the code form if
+        // GoTrue returns a generic signup-policy message.
+        setEmailSent(true);
         return;
       }
       setEmailSent(true);

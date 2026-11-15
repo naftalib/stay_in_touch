@@ -77,6 +77,10 @@ Pending Grok 4.7 review.
 
 - Run [43735855549](https://github.com/naftalib/stay_in_touch/actions/runs/43735855549): invite mail works; invite E2E failed because `latestEmailTo` picked the invite email (no OTP). Wait for code UI and pass `since` after requesting the sign-in code.
 
+## CI fix round 10 (Nov 15)
+
+- `InvitePage.sendCode` mirrors sign-in OTP: show the code form unless rate-limited (invitee auth user already exists). E2E uses the full button label and `textbox` role for the code field.
+
 ## Follow-ups carried forward
 
 - Expand Playwright to full spec §10 list and axe matrix on new screens.

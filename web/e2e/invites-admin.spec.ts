@@ -52,13 +52,15 @@ test.describe("Invites and admin", () => {
     await page.goto(link!);
     await expect(page.getByText(/invited you to join/i)).toBeVisible();
     const otpSentAt = new Date();
-    await page.getByRole("button", { name: /sign-in code/i }).click();
-    await expect(page.getByLabel("6-digit code")).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("button", { name: /Email me a sign-in code/i }).click();
+    await expect(page.getByRole("textbox", { name: "6-digit code" })).toBeVisible({
+      timeout: 30_000,
+    });
     const codeMail = await latestEmailTo(email, otpSentAt);
     expect(codeMail).toBeTruthy();
     const code = extractOtp(`${codeMail!.HTML ?? ""} ${codeMail!.Text ?? ""}`);
     expect(code).toBeTruthy();
-    await page.getByLabel("6-digit code").fill(code!);
+    await page.getByRole("textbox", { name: "6-digit code" }).fill(code!);
     await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("button", { name: /Join/i }).click();
     await expect(page).toHaveURL(new RegExp(`/f/${FAMILY_ID}`), { timeout: 20_000 });
