@@ -1,12 +1,14 @@
 .wrap {
   display: flex;
   flex-direction: column;
-  block-size: 100%;
+  flex: 1;
   min-block-size: 0;
+  overflow: hidden;
 }
 
 .nav {
   flex: 1;
+  min-block-size: 0;
   overflow-y: auto;
   padding: var(--space-4);
 }
@@ -133,6 +135,7 @@
 }
 
 .footer {
+  flex-shrink: 0;
   padding: var(--space-4);
   border-block-start: 1px solid var(--color-border);
   display: flex;
