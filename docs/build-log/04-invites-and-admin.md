@@ -13,7 +13,7 @@ Handoff 04: invite tokens and email, `/invite` accept flow, child passwords and 
 
 ## PR
 
-_(filled when the PR is open)_
+https://github.com/naftalib/stay_in_touch/pull/4
 
 ## What was built
 
@@ -37,7 +37,14 @@ Pending Grok 4.7 review.
 
 - **`email_confirm: false` on `auth.admin.createUser`:** Used for invite-created users; E2E relies on OTP + `verifyOtp` to confirm (see ADR 0048).
 - **Realtime after removal:** Client unsubscribes all channels on `TOKEN_REFRESHED`; dedicated Realtime drop test still TODO in Playwright (see ADR 0056).
-- **CI job durations:** To be recorded from the first green run.
+- **CI job durations (run [43729437566](https://github.com/naftalib/stay_in_touch/actions/runs/43729437566) on `02f00e7`, after pgTAP/types fixes):** web ~24s, functions ~10s, db ~77s; e2e failed on Playwright (invite helper double-read of `fetch` body; one webkit sign-in flake).
+
+## CI fix round 2 (Nov 15)
+
+- Revoked `EXECUTE` on new `private.*` invite helpers from `anon`/`authenticated`; catalog test `93` exempts `invitation_preview` for anon.
+- pgTAP `98`: rate-limit setup via `reset role`; `plan(12)` matches assertions.
+- Regenerated-shape `database.types.ts` (column order + RPC signatures).
+- E2E: read each `fetch` response body once in `invites-admin.spec.ts`; widened sign-in redirect timeout in fixtures.
 
 ## Follow-ups carried forward
 

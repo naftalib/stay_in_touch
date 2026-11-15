@@ -54,9 +54,9 @@ export async function signInWithPassword(page: import("@playwright/test").Page, 
   await passwordPanel.getByRole("textbox", { name: "Email" }).fill(user.email);
   await passwordPanel.getByRole("textbox", { name: "Password" }).fill(user.password);
   await passwordPanel.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).not.toHaveURL(/sign-in/, { timeout: 15_000 });
+  await expect(page).not.toHaveURL(/sign-in/, { timeout: 30_000 });
   await expect(page).toHaveURL(/\/f\/[^/]+\/s\/[^/]+\/messages/, {
-    timeout: 15_000,
+    timeout: 30_000,
   });
 }
 

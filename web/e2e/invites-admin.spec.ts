@@ -36,8 +36,9 @@ test.describe("Invites and admin", () => {
       p_label: "Aunt Two",
       p_create_space: false,
     });
-    expect(createRes.ok, await createRes.text()).toBeTruthy();
-    const invitationId = (await createRes.json()) as string;
+    const createBody = await createRes.text();
+    expect(createRes.ok, createBody).toBeTruthy();
+    const invitationId = JSON.parse(createBody) as string;
     const fnRes = await fetch(`${process.env.VITE_SUPABASE_URL}/functions/v1/invite-send`, {
       method: "POST",
       headers: {
@@ -47,7 +48,8 @@ test.describe("Invites and admin", () => {
       },
       body: JSON.stringify({ invitation_id: invitationId }),
     });
-    expect(fnRes.ok, await fnRes.text()).toBeTruthy();
+    const fnBody = await fnRes.text();
+    expect(fnRes.ok, fnBody).toBeTruthy();
 
     const inviteMail = await latestEmailTo(email);
     const link = inviteMail.match(/https?:\/\/[^\s]+invite#[\w-]+/i)?.[0];
@@ -72,7 +74,8 @@ test.describe("Invites and admin", () => {
     const removeRes = await rpc(SEED_USERS.mom.email, "remove_member", {
       p_member_id: "a2000000-0000-4000-8000-000000000005",
     });
-    expect(removeRes.ok, await removeRes.text()).toBeTruthy();
+    const removeBody = await removeRes.text();
+    expect(removeRes.ok, removeBody).toBeTruthy();
     const noaToken = await accessToken(SEED_USERS.noa.email);
     const res = await fetch(
       `${process.env.VITE_SUPABASE_URL}/rest/v1/messages?space_id=eq.a3000000-0000-4000-8000-000000000001&select=id`,
