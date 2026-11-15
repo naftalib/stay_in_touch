@@ -1,5 +1,14 @@
-<h2>Sign in to Stay In Touch</h2>
-<p>Tap the link on this device, or enter the code on another device.</p>
-<p><a href="{{ .ConfirmationURL }}">Sign in</a></p>
-<p>Your sign-in code: <strong>{{ .Token }}</strong></p>
-<p>This link and code work for one hour.</p>
+<!DOCTYPE html>
+<html lang="en">
+<body style="font-family:system-ui,sans-serif;font-size:18px;line-height:1.5;color:#111;padding:24px;max-width:32rem;">
+  <h1 style="font-size:24px;">Sign in to Stay In Touch</h1>
+  <p style="font-size:20px;">Tap the button on this device, or enter the code on another device.</p>
+  <p style="margin:32px 0;">
+    <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#1a5cff;color:#fff;text-decoration:none;font-size:20px;padding:16px 28px;border-radius:12px;">Sign in</a>
+  </p>
+  <p style="font-size:18px;">Your sign-in code:</p>
+  <p style="font-size:32px;letter-spacing:0.2em;"><strong>{{ .Token }}</strong></p>
+  <p style="font-size:16px;color:#444;">This link and code work for one hour.</p>
+  <p style="font-size:16px;color:#444;">If you weren't expecting this, you can ignore it.</p>
+</body>
+</html>

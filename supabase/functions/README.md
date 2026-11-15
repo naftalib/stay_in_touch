@@ -1,11 +1,37 @@
 # Edge Functions
 
-This folder is where the Supabase CLI looks for Edge Functions (`supabase functions serve` and `supabase functions deploy`). There are no functions yet.
+## Functions
 
-Shared code will live in `_shared/`, which Supabase does not deploy as its own function.
+| Function      | Auth                            | Purpose                                                                                                       |
+| ------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `invite-send` | User JWT (`verify_jwt` default) | Issues invite token via `issue_invitation_token`, ensures auth user exists (service role), sends invite email |
 
-When a function is added:
+Shared code lives in `_shared/` (not deployed as its own function).
 
-- Use the caller's JWT for anything row-level security should check.
-- Use the secret key only for work the caller must not do directly, such as writing `notification_outbox` or minting media URLs. Never return that key.
-- Handle CORS in the function. Current Supabase CLI no longer injects CORS headers for local functions.
+## Local run
+
+1. `supabase start` (includes Edge Runtime and Mailpit).
+2. Copy `supabase/functions/.env.example` to `supabase/functions/.env` (gitignored) or export the
+   same variables.
+3. `supabase functions serve --env-file supabase/functions/.env`
+
+Required secrets: `EMAIL_TRANSPORT=mailpit`, `APP_URL=http://127.0.0.1:5173`, `EMAIL_FROM`.
+
+When functions are invoked through local Kong (for example Playwright E2E), they run inside the
+Supabase Docker network. Export `MAILPIT_URL=http://inbucket:8025` before `supabase start`, or rely
+on the default in `_shared/email.ts`. `supabase functions serve` on the host uses
+`MAILPIT_URL=
+http://127.0.0.1:54324` from `.env.example`.
+
+## Tests
+
+From `supabase/functions`:
+
+```bash
+deno fmt --check
+deno lint
+deno check **/*.ts
+deno test --allow-env
+```
+
+CI runs these in the `functions` job (Deno 2.9.8).

@@ -11,6 +11,7 @@ web/test-results/
 .env
 .env.*
 !.env.example
+!supabase/functions/.env.example
 
 # Supabase local artifacts
 supabase/.temp/

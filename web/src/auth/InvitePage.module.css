@@ -1,0 +1,69 @@
+.page {
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-4);
+  font-size: var(--text-lg);
+}
+
+.lead {
+  margin-block: var(--space-4);
+}
+
+.email {
+  color: var(--color-text-muted);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.primary {
+  min-height: 3rem;
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--text-lg);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-accent-on);
+  border: none;
+  cursor: pointer;
+}
+
+.secondary {
+  min-height: 3rem;
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--text-base);
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+}
+
+.secondaryLink {
+  font-size: var(--text-base);
+  color: var(--color-accent);
+}
+
+.error {
+  color: var(--color-danger);
+}

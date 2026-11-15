@@ -52,6 +52,31 @@ export function mapError(error: unknown): AppError {
   }
 
   if (isPostgrestError(error)) {
+    if (error.message.includes('cannot remove the last admin')) {
+      return {
+        title:
+          'This family needs at least one parent. Choose another parent before removing this one.',
+        code: error.code,
+      }
+    }
+    if (error.message.includes('cannot demote the last admin')) {
+      return {
+        title: 'This family needs at least one parent. Choose another parent first.',
+        code: error.code,
+      }
+    }
+    if (error.message.includes('space is archived')) {
+      return {
+        title: 'That space is archived. Restore it before renaming.',
+        code: error.code,
+      }
+    }
+    if (error.message.includes('grandparents do not get a space')) {
+      return {
+        title: "Grandparents don't get their own space.",
+        code: error.code,
+      }
+    }
     if (error.code === '42501' || error.message.includes('permission')) {
       return {
         title: "You don't have permission to do that.",
@@ -92,6 +117,15 @@ export function mapError(error: unknown): AppError {
         title: 'App is not configured',
         detail: error.message,
       }
+    }
+    if (
+      error.message.includes('Too many emails') ||
+      error.message.includes('wait a minute') ||
+      error.message.includes('Email service') ||
+      error.message.includes('could not be delivered') ||
+      error.message.includes("didn't go out")
+    ) {
+      return { title: error.message, code: undefined }
     }
     return {
       title: 'Something went wrong. Please try again.',

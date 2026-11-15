@@ -24,6 +24,15 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function pathAfterSignOut(): string {
+  if (sessionStorage.getItem("stay-return-to-invite") === "1") {
+    sessionStorage.removeItem("stay-return-to-invite");
+    const token = sessionStorage.getItem("stay-invite-token");
+    if (token) return `/invite#${token}`;
+  }
+  return "/sign-in?signedOut=1";
+}
+
 async function fetchDisplayName(userId: string): Promise<string | undefined> {
   const supabase = getSupabase();
   const { data } = await supabase
@@ -77,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === "SIGNED_OUT") {
         window.setTimeout(() => {
           void clearClientState().then(() => {
-            navigate("/sign-in?signedOut=1", {
+            navigate(pathAfterSignOut(), {
               replace: true,
               state: { signedOut: true },
             });
@@ -108,8 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.setItem("stay-signed-out", "1");
     await clearClientState();
     await getSupabase().auth.signOut();
-    navigate("/sign-in?signedOut=1", { replace: true, state: { signedOut: true } });
-  }, [clearClientState, navigate]);
+  }, [clearClientState]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

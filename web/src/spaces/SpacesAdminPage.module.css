@@ -1,0 +1,83 @@
+.page {
+  padding: var(--space-4);
+  max-width: 40rem;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-6) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.row {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.meta {
+  color: var(--color-text-muted);
+  margin: var(--space-2) 0;
+}
+
+.rowActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.rowActions button,
+.titleRow button,
+.create button {
+  min-height: 3rem;
+  padding: 0.5rem 0.9rem;
+}
+
+.create {
+  margin-top: var(--space-8);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.primary {
+  min-height: 3rem;
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-accent);
+  color: var(--color-accent-on);
+  border: none;
+  border-radius: var(--radius-md);
+}
+
+.renameForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.status {
+  color: var(--color-success, #0a6640);
+}
+
+.error {
+  color: var(--color-danger);
+}
+
+.disabledHint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

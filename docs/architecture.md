@@ -2,7 +2,7 @@
 
 ## Overview
 
-Stay In Touch is a private, invite-only family social app: one family per tenant, spaces for General, each parent, and each child, with grandparents able to visit every space. The repo has the **database layer** and the **first web screens** (sign-in, app shell, message threads); Edge Functions, media upload, email delivery, and push are planned.
+Stay In Touch is a private, invite-only family social app: one family per tenant, spaces for General, each parent, and each child, with grandparents able to visit every space. The repo has the **database layer**, **first web screens**, and **invite email + admin tools** (handoff 04); media upload, notification digests, and push remain planned.
 
 ```mermaid
 flowchart LR
@@ -17,7 +17,7 @@ flowchart LR
     Auth["Auth"]
     PG["Postgres + RLS"]
     RT["Realtime Broadcast"]
-    EF["Edge Functions (README only)"]
+    EF["Edge Functions<br/>(invite-send)"]
   end
   subgraph notify["Notifications (planned)"]
     Resend["Resend SMTP"]
@@ -33,6 +33,7 @@ flowchart LR
   Web -.-> EF
   EF -.-> R2
   EF -.-> PG
+  EF -.-> Auth
   Auth -.-> Resend
   Web -.-> Push
   API -.-> PG
@@ -40,9 +41,9 @@ flowchart LR
 
 | Folder | Responsibility | Status |
 |---|---|---|
-| `web/` | PWA UI, Supabase client, accessibility-first components | **First screens** (auth, shell, threads) |
+| `web/` | PWA UI, Supabase client, accessibility-first components | **Auth, shell, threads, invite, admin** |
 | `supabase/` | Migrations, seed, pgTAP tests, local CLI config | **Implemented** |
-| `supabase/functions/` | Signed URLs, media status, outbox workers | README only |
+| `supabase/functions/` | `invite-send`, shared email + templates; later media/outbox | **`invite-send`** |
 | `api/` | Later AI / Python services | README only |
 | `docs/` | Architecture, ADRs, build log, hosted checklist | Living docs |
 | `.github/workflows/` | Web unit tests, E2E vs local Supabase, database CI | **Implemented** |
@@ -54,10 +55,10 @@ For roles, tables, RLS, RPCs, and Realtime behavior, see the sections below. Pla
 | Area | Responsibility |
 |---|---|
 | `app/` | `AppProviders`, `routes.tsx` (React Router 8 declarative) |
-| `auth/` | Session provider, sign-in, callback, `RequireAuth` |
-| `family/` | Families, the signed-in membership, spaces, sibling labels, unread counts |
+| `auth/` | Session, sign-in, `/invite`, recent accounts, callback, `RequireAuth` |
+| `family/` | Families, memberships, pending invites, spaces, sibling labels, unread |
 | `shell/` | `AppShell`, `SideNav`, `buildNav`, drawer, tabs, connection banner |
-| `spaces/` | Space page, unavailable screen, audience line, placeholder tabs |
+| `spaces/` | Space page, Members/Spaces admin, unavailable screen, audience line |
 | `messages/` | Thread, composer, cache merge, realtime refetch by id |
 | `settings/` | Text size control (`data-text-size` on `<html>`) |
 | `ui/` | Thin React Aria wrappers |
@@ -125,7 +126,7 @@ Policies are one per command, `to authenticated`, and use `space_id in (select p
 
 Clients have no insert or update grants on memberships, invitations, spaces, or the audit log. Those changes go through security-definer RPCs that check the caller and write `audit_log`:
 
-- `create_invitation`, `revoke_invitation`, `remove_member`, `change_member_role`
+- `create_invitation`, `revoke_invitation`, `issue_invitation_token`, `accept_invitation`, `accept_invite`, `invitation_preview`, `my_pending_invitations`, `remove_member`, `change_member_role`
 - `create_member_space`, `rename_space`, `archive_space`, `unarchive_space`
 - `accept_invite` — matches the signed-in user's confirmed `auth.users.email`, uses the invitation's role, and creates a space only when the invitation says so. A `+alias` child is a separate user. A parent signs in as that child to accept. They cannot accept the invite while signed in as themselves.
 
@@ -136,6 +137,30 @@ Read RPCs are security invoker, so RLS still applies: `space_audience`, `unread_
 Authors can edit their own body or caption and soft-delete. Admins can soft-delete anyone's post and cannot change the body. A deleted post cannot be edited or restored by its author. Only an admin can clear `deleted_at`. Other members do not see a soft-deleted row. The author and the family's admins still can: Postgres checks the updated row against the select policy, so the person who deletes it has to be allowed to read it afterwards. Identity columns (`space_id`, `family_id`, author, `created_at`) cannot change after insert. Clients have no `DELETE` grant on content.
 
 Clients cannot set server-owned columns on insert. A message cannot arrive with `edited_at` or `deleted_at` already set. Media inserted by a client is `pending` / `r2`, with no asset id or file metadata. `profiles.avatar_key`, when set, must look like `u/{user_id}/avatar/{file}`.
+
+### Invite flow (handoff 04)
+
+```mermaid
+sequenceDiagram
+  participant Admin as Parent (admin)
+  participant EF as invite-send
+  participant PG as Postgres RPCs
+  participant Mail as Mailpit / SMTP
+  participant Invitee as Invitee browser
+  participant Auth as Supabase Auth
+  Admin->>PG: create_invitation
+  Admin->>EF: invoke invite-send
+  EF->>PG: issue_invitation_token
+  EF->>Auth: admin.createUser (service role)
+  EF->>Mail: sendEmail (link /invite#token)
+  Invitee->>PG: invitation_preview (anon)
+  Invitee->>Auth: signInWithOtp + verifyOtp
+  Invitee->>PG: accept_invitation(token)
+```
+
+`invitations.token_hash` is never granted to clients. Resend rotates the hash. Revoke keeps the hash and sets `status = 'revoked'`, so the old link can say the invitation was cancelled while accept still fails. `invite-send` creates the auth user with the email already confirmed (ADR 0060) because signup is closed. `private.cleanup_orphan_invite_auth_users` runs on a daily pg_cron schedule when the extension is available.
+
+Admin UI routes: `/f/:familyId/members`, `/f/:familyId/spaces`. Public accept route: `/invite` (token in fragment).
 
 ## Realtime
 

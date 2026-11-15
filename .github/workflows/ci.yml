@@ -38,8 +38,32 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 3.1.0
-      - name: Start Supabase (auth, API, Realtime, Mailpit)
-        run: supabase start -x studio,storage-api,imgproxy,edge-runtime,logflare,vector,supavisor
+      - name: Start Supabase (auth, API, Realtime, Mailpit, Edge Runtime)
+        env:
+          # Edge runtime runs on the Supabase Docker network; Mailpit is reachable as inbucket:8025.
+          MAILPIT_URL: http://inbucket:8025
+          EMAIL_TRANSPORT: mailpit
+          APP_URL: http://127.0.0.1:5173
+          EMAIL_FROM: Stay In Touch <no-reply@example.test>
+        run: |
+          free_ports() {
+            supabase stop --no-backup || true
+            docker ps -aq --filter name=supabase_ | xargs -r docker rm -f
+            docker network prune -f || true
+            for p in 54321 54322 54323 54324 54325 54326 54327; do
+              sudo lsof -ti:"$p" | xargs -r sudo kill -9
+              sudo fuser -k "${p}/tcp" 2>/dev/null || true
+            done
+            sleep 5
+          }
+          for attempt in 1 2 3 4 5; do
+            free_ports
+            if supabase start -x studio,storage-api,imgproxy,logflare,vector,supavisor; then
+              exit 0
+            fi
+            echo "supabase start failed (attempt ${attempt}), retrying..."
+          done
+          exit 1
       - name: Reset database
         run: supabase db reset
       - name: Check generated types drift
@@ -68,6 +92,21 @@ jobs:
           name: playwright-report
           path: web/playwright-report/
           if-no-files-found: ignore
+
+  functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.8
+      - name: Deno fmt, lint, check, test
+        working-directory: supabase/functions
+        run: |
+          deno fmt --check "**/*.ts" "**/deno.json"
+          deno lint
+          deno check **/*.ts
+          deno test --allow-env
 
   db:
     runs-on: ubuntu-latest

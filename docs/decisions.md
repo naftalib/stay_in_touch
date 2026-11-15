@@ -69,6 +69,25 @@ This index mirrors the old table so existing links to `docs/decisions.md` still 
 | Realtime subscription scope | [0045](./decisions/0045-realtime-subscription-scope.md) |
 | Child nav sibling labels | [0046](./decisions/0046-child-nav-sibling-labels.md) |
 
+## Invites and admin (handoff 04)
+
+| Topic | ADR |
+|---|---|
+| Invite email via Edge Function | [0047](./decisions/0047-invite-email-edge-function.md) |
+| Rotating invite token (URL fragment) | [0048](./decisions/0048-invite-token-hash-fragment.md) |
+| Auth user at invite send | [0049](./decisions/0049-invite-time-auth-user.md) |
+| Child password + recent accounts | [0050](./decisions/0050-child-password-recent-accounts.md) |
+| Admin tools scope | [0051](./decisions/0051-admin-tools-scope.md) |
+| Plain HTML invite email | [0052](./decisions/0052-plain-html-invite-email.md) |
+| Email transport phases (Mailpit / Gmail / Resend) | [0053](./decisions/0053-email-transport-phases.md) |
+| Edge Function auth (`@supabase/server`) | [0054](./decisions/0054-edge-function-supabase-server.md) |
+| Handoff 04 testing strategy | [0055](./decisions/0055-handoff-04-testing-strategy.md) |
+| JWT expiry + removed members | [0056](./decisions/0056-jwt-expiry-removed-members.md) |
+| Orphan invite auth cleanup | [0057](./decisions/0057-orphan-invite-auth-cleanup.md) |
+| Child password minimum (6) | [0058](./decisions/0058-child-password-minimum.md) |
+| Child email +alias hint only | [0059](./decisions/0059-child-email-alias-hint.md) |
+| Confirm invite users so OTP works with signup closed | [0060](./decisions/0060-invite-user-email-confirmed.md) |
+
 ## Future additions
 
 | Topic | ADR |

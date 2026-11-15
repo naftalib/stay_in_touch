@@ -52,6 +52,13 @@ pnpm test:e2e              # Playwright; needs supabase start, .env, and a built
 
 `pnpm db:start`, `pnpm db:reset`, and `pnpm db:test` wrap the same Supabase commands.
 
+### Trying invites locally
+
+1. Serve functions with Mailpit transport: copy `supabase/functions/.env.example` → `supabase/functions/.env`, then `supabase functions serve --env-file supabase/functions/.env`.
+2. Sign in as Mom, open **Family → Members**, invite someone. The email lands in Mailpit (`http://127.0.0.1:54324`).
+3. Open `/invite#…` from that email, request a sign-in code (also in Mailpit), then **Join**.
+4. Deno tests: `cd supabase/functions && deno test --allow-env`.
+
 ## Seed logins (local only)
 
 `supabase/seed.sql` creates one demo family. Every account uses the password `local-dev-only`. Do not run the seed against a hosted project.
