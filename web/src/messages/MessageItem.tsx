@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button, Menu, MenuItem, MenuTrigger, Popover } from "react-aria-components";
+import PhotoGrid from "../media/PhotoGrid.tsx";
 import type { FamilyRole } from "../lib/database.helpers.ts";
 import type { ThreadMessage } from "./types.ts";
 import QuotedMessage from "./QuotedMessage.tsx";
@@ -18,6 +19,7 @@ export type MessageItemProps = {
   onScrollToQuote?: (messageId: string) => void;
   onRetry?: (message: ThreadMessage) => void;
   onRemoveFailed?: (message: ThreadMessage) => void;
+  memberId?: string;
 };
 
 export default function MessageItem({
@@ -33,6 +35,7 @@ export default function MessageItem({
   onScrollToQuote,
   onRetry,
   onRemoveFailed,
+  memberId = "",
 }: MessageItemProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.body);
@@ -148,9 +151,18 @@ export default function MessageItem({
             </Button>
           </div>
         </form>
-      ) : (
+      ) : message.body.trim() ? (
         <p className={styles.body}>{message.body}</p>
-      )}
+      ) : null}
+
+      {message.photos && message.photos.length > 0 ? (
+        <PhotoGrid
+          photos={message.photos}
+          spaceId={message.space_id}
+          memberId={memberId}
+          role={role}
+        />
+      ) : null}
 
       <footer className={styles.actions}>
         {message.sendStatus === "failed" ? (

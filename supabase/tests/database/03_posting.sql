@@ -149,7 +149,7 @@ select lives_ok(
   'grandparent can post in a child space'
 );
 
-select lives_ok(
+select throws_ok(
   $$
     insert into public.media (
       id, space_id, family_id, uploader_member_id, kind, r2_key, content_type, created_by
@@ -165,7 +165,9 @@ select lives_ok(
       'b1000000-0000-4000-8000-000000000003'
     )
   $$,
-  'grandparent can upload media in a child space'
+  '42501',
+  NULL,
+  'a grandparent cannot insert media directly; reserve_photo_upload is the path'
 );
 
 select test.login('mom@fixture.test');

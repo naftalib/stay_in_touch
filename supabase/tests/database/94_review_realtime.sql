@@ -119,14 +119,21 @@ select is(
   1, 'a media update broadcasts to its space topic'
 );
 
-select is(
+select ok(
   (
-    select payload -> 'record' ->> 'body'
+    select
+      (payload ? 'table')
+      and (payload ? 'operation')
+      and (payload -> 'record' ? 'id')
+      and (payload -> 'record' ? 'space_id')
+      and (payload - 'id' - 'table' - 'operation' - 'record') = '{}'::jsonb
+      and ((payload -> 'record') - 'id' - 'space_id') = '{}'::jsonb
+      and payload::text not like '%Broadcast me%'
     from realtime.messages
     where payload -> 'record' ->> 'id' = 'b4000000-0000-4000-8000-000000000094'
       and event = 'UPDATE'
   ),
-  NULL, 'the soft-delete broadcast does not include the deleted body'
+  'a soft-delete broadcast carries only table, operation, id, and space_id'
 );
 
 select ok(

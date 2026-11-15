@@ -97,7 +97,8 @@ test.describe("Invites and admin", () => {
     const codeMail = await latestEmailTo(
       email,
       otpSentAt,
-      (message) => !mailText(message).includes("/invite#") && Boolean(extractOtp(mailText(message))),
+      (message) =>
+        !mailText(message).includes("/invite#") && Boolean(extractOtp(mailText(message))),
     );
     const code = extractOtp(mailText(codeMail));
     expect(code).toMatch(/^\d{6}$/);
@@ -139,7 +140,8 @@ test.describe("Invites and admin", () => {
     const codeMail = await latestEmailTo(
       email,
       otpSentAt,
-      (message) => !mailText(message).includes("/invite#") && Boolean(extractOtp(mailText(message))),
+      (message) =>
+        !mailText(message).includes("/invite#") && Boolean(extractOtp(mailText(message))),
     );
     const code = extractOtp(mailText(codeMail));
     expect(code).toMatch(/^\d{6}$/);
@@ -148,7 +150,7 @@ test.describe("Invites and admin", () => {
     await page.getByRole("button", { name: /Join/i }).click();
     await expect(page.getByRole("heading", { name: "Choose a password for Lia" })).toBeVisible();
     await expectAxeModes(page);
-    await page.getByLabel("Password (at least 8 characters)").fill("lia-pass-1");
+    await page.getByLabel("Password (at least 6 characters)").fill("lia123");
     await page.getByRole("button", { name: "Show password" }).click();
     await page.getByRole("button", { name: "Save password" }).click();
     await expect(page.getByRole("heading", { name: "Lia is ready" })).toBeVisible();
@@ -164,7 +166,7 @@ test.describe("Invites and admin", () => {
     await page.getByRole("tab", { name: "Sign in with password" }).click();
     const panel = page.getByRole("tabpanel", { name: "Sign in with password" });
     await panel.getByRole("textbox", { name: "Email" }).fill(email);
-    await panel.getByRole("textbox", { name: "Password" }).fill("lia-pass-1");
+    await panel.getByRole("textbox", { name: "Password" }).fill("lia123");
     await panel.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(new RegExp(`/f/${FAMILY_ID}/s/`), { timeout: 20_000 });
     await switchAccountFromApp(page);
@@ -227,7 +229,9 @@ test.describe("Invites and admin", () => {
     test.setTimeout(90_000);
     const email = "expired@example.test";
     await createAndSend(email, "grandparent", "Expired", false);
-    psql(`update public.invitations set expires_at = now() - interval '1 hour' where email = '${email}'`);
+    psql(
+      `update public.invitations set expires_at = now() - interval '1 hour' where email = '${email}'`,
+    );
     const link = inviteLink(await latestEmailTo(email));
     await page.goto(link!);
     await expect(page.getByRole("heading", { name: /expired/i })).toBeVisible();
@@ -352,12 +356,19 @@ test.describe("Invites and admin", () => {
     await page.getByRole("textbox", { name: "Space title" }).fill("New Parent");
     await page.getByRole("button", { name: "Create space" }).click();
     await expect(page.getByRole("status")).toContainText(/created/i);
-    const general = page.getByRole("main").getByRole("listitem").filter({ hasText: "General" }).first();
+    const general = page
+      .getByRole("main")
+      .getByRole("listitem")
+      .filter({ hasText: "General" })
+      .first();
     await general.getByRole("button", { name: "Rename" }).click();
     await general.getByRole("textbox", { name: "Title" }).fill("Everyone");
     await general.getByRole("button", { name: "Save" }).click();
     await expect(page.getByRole("heading", { name: "Everyone" })).toBeVisible();
-    const momSpace = page.getByRole("main").getByRole("listitem").filter({ has: page.getByRole("heading", { name: "Mom" }) });
+    const momSpace = page
+      .getByRole("main")
+      .getByRole("listitem")
+      .filter({ has: page.getByRole("heading", { name: "Mom" }) });
     await momSpace.getByRole("button", { name: "Archive" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Archive" }).click();
     await expect(momSpace).toContainText("Archived");
@@ -464,15 +475,12 @@ test.describe("Invites and admin", () => {
     await new Promise((resolve) => setTimeout(resolve, 5_000));
     expect(received).toBe(afterRemoval);
 
-    const rest = await fetch(
-      `${url}/rest/v1/messages?space_id=eq.${SPACES.general}&select=id`,
-      {
-        headers: {
-          apikey: key,
-          Authorization: `Bearer ${refreshed.data.session?.access_token ?? ""}`,
-        },
+    const rest = await fetch(`${url}/rest/v1/messages?space_id=eq.${SPACES.general}&select=id`, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${refreshed.data.session?.access_token ?? ""}`,
       },
-    );
+    });
     const rows = (await rest.json()) as unknown[];
     expect(Array.isArray(rows) ? rows.length : 0).toBe(0);
     await noa.removeChannel(channel);
@@ -497,7 +505,12 @@ test.describe("Invites and admin", () => {
     await expectAxeModes(page);
     await page.keyboard.press("Escape");
 
-    await page.getByRole("main").getByRole("listitem").filter({ hasText: "Dad" }).getByRole("button", { name: "Change role" }).click();
+    await page
+      .getByRole("main")
+      .getByRole("listitem")
+      .filter({ hasText: "Dad" })
+      .getByRole("button", { name: "Change role" })
+      .click();
     await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
     await expect(page.getByRole("alertdialog")).toBeVisible();
     await expectAxeModes(page);

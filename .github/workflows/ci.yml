@@ -45,6 +45,11 @@ jobs:
           EMAIL_TRANSPORT: mailpit
           APP_URL: http://127.0.0.1:5173
           EMAIL_FROM: Stay In Touch <no-reply@example.test>
+          MEDIA_PROVIDER: supabase
+          MEDIA_BUCKET: photos
+          MEDIA_PUBLIC_BASE_URL: http://127.0.0.1:54321
+          MEDIA_UPLOAD_MAX_BYTES: "5242880"
+          MEDIA_CLEANUP_SECRET: local-cleanup-dev
         run: |
           free_ports() {
             supabase stop --no-backup || true
@@ -58,7 +63,7 @@ jobs:
           }
           for attempt in 1 2 3 4 5; do
             free_ports
-            if supabase start -x studio,storage-api,imgproxy,logflare,vector,supavisor; then
+            if supabase start -x studio,imgproxy,logflare,vector,supavisor; then
               exit 0
             fi
             echo "supabase start failed (attempt ${attempt}), retrying..."
@@ -116,7 +121,7 @@ jobs:
         with:
           version: 3.1.0
       - name: Start local Postgres
-        run: supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+        run: supabase start -x gotrue,realtime,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
       - name: Apply migrations and seed from scratch
         run: supabase db reset
       - name: pgTAP

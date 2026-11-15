@@ -1,19 +1,29 @@
-import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   // One env file at the repo root, shared with later packages.
-  envDir: '..',
+  envDir: "..",
   server: {
-    host: '127.0.0.1',
+    host: "127.0.0.1",
     port: 5173,
     strictPort: true,
   },
   preview: {
-    host: '127.0.0.1',
+    host: "127.0.0.1",
     port: 5173,
     strictPort: true,
   },
-})
+  build: {
+    rollupOptions: {
+      output: {
+        chunkFileNames(chunk) {
+          const name = chunk.name.includes("heic") ? "heic-to" : chunk.name;
+          return `assets/${name}-[hash].js`;
+        },
+      },
+    },
+  },
+});

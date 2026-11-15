@@ -2,14 +2,14 @@
 
 A private, invite-only app for one family. Parents and children each have a space, grandparents can see every space, and children see only General and their own space.
 
-This repository has the monorepo skeleton, the database, and the first signed-in screens: password and email-code sign-in, the family shell, and message threads.
+This repository has the database, signed-in screens, invite email, and photos. Grandma can post a photo in Noa's space. The Pics tab lists the space's photos. Video is hidden.
 
 ## Layout
 
 ```
 web/                  Vite + React + TypeScript app
 supabase/             CLI project: migrations, seed, pgTAP tests
-supabase/functions/   Edge Functions (README only)
+supabase/functions/   Edge Functions (invite email and photos)
 api/                  Reserved for a later FastAPI service
 docs/                 Architecture, ADRs, build log, hosted settings
 .cursor/rules/        Scoped agent rules
@@ -72,7 +72,7 @@ pnpm test:e2e              # Playwright; needs supabase start, .env, and a built
 | Noa | `mom+noa@example.test` | member, own space |
 | Ari | `mom+ari@example.test` | member, own space |
 
-There is also a pending invitation for `aunt@example.test`. General has a quote-reply and one soft-deleted message. Media rows use fake R2 keys and are marked `ready`.
+There is also a pending invitation for `aunt@example.test`. General has a quote-reply and one soft-deleted message. Seed photos are marked `ready` and use stored keys. Studio, when started, is on port 54323. The default `supabase start` for this handoff leaves Studio off.
 
 pgTAP tests do not use this seed. They build a second family and a removed member of their own, then roll back.
 

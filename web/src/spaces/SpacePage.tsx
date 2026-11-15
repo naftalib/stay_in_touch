@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 import { Navigate, useParams } from "react-router";
+import { useFamily } from "../family/FamilyProvider.tsx";
 import { useSpaces } from "../family/useSpaces.ts";
 import { isUuid } from "../lib/uuid.ts";
 import AudienceLine from "./AudienceLine.tsx";
-import PlaceholderTab from "./PlaceholderTab.tsx";
+import PicsTab from "../media/PicsTab.tsx";
 import SpaceUnavailable from "./SpaceUnavailable.tsx";
 import Thread from "../messages/Thread.tsx";
 import { isSpaceTab } from "../shell/SpaceTabs.tsx";
@@ -16,6 +17,7 @@ export default function SpacePage() {
     tab: string;
   }>();
 
+  const { memberId, role } = useFamily();
   const spacesQuery = useSpaces(familyId ?? "");
   const space = spacesQuery.data?.find((s) => s.id === spaceId);
 
@@ -80,10 +82,10 @@ export default function SpacePage() {
           spaceTitle={space.title}
           archived={archived}
         />
-      ) : tab === "pics" ? (
-        <PlaceholderTab kind="pics" />
+      ) : tab === "video" ? (
+        <Navigate to={`/f/${familyId}/s/${spaceId}/messages`} replace />
       ) : (
-        <PlaceholderTab kind="video" />
+        <PicsTab spaceId={spaceId} memberId={memberId} role={role} />
       )}
     </article>
   );

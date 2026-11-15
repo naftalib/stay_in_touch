@@ -3,7 +3,7 @@ select set_config('search_path', 'public, extensions', true);
 
 \ir _fixtures.sql.inc
 
-select plan(10);
+select plan(12);
 
 select has_trigger(
   'public',
@@ -137,6 +137,40 @@ select throws_ok(
   '23503',
   NULL,
   'an owner space must belong to the owner''s family'
+);
+
+select test.login('mom@fixture.test');
+set local role authenticated;
+select lives_ok(
+  $$
+    insert into public.messages (id, space_id, family_id, author_member_id, body, created_by)
+    values (
+      'b4000000-0000-4000-8000-000000000010',
+      'b3000000-0000-4000-8000-000000000001',
+      'b0000000-0000-4000-8000-000000000001',
+      'b2000000-0000-4000-8000-000000000001',
+      'Ids only please',
+      'b1000000-0000-4000-8000-000000000001'
+    )
+  $$,
+  'mom posts so the broadcast shape can be checked'
+);
+reset role;
+select ok(
+  (
+    select
+      (payload ? 'table')
+      and (payload ? 'operation')
+      and (payload -> 'record' ? 'id')
+      and (payload -> 'record' ? 'space_id')
+      and (payload - 'id' - 'table' - 'operation' - 'record') = '{}'::jsonb
+      and ((payload -> 'record') - 'id' - 'space_id') = '{}'::jsonb
+      and payload::text not like '%Ids only please%'
+    from realtime.messages
+    where payload -> 'record' ->> 'id' = 'b4000000-0000-4000-8000-000000000010'
+      and event = 'INSERT'
+  ),
+  'a message broadcast carries only table, operation, id, and space_id'
 );
 
 select * from finish();

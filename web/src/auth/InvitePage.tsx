@@ -176,8 +176,8 @@ export default function InvitePage() {
   }
 
   async function saveChildPassword() {
-    if (childPassword.length < 8) {
-      setError({ title: "Choose at least 8 characters." });
+    if (childPassword.length < 6) {
+      setError({ title: "Choose at least 6 characters." });
       return;
     }
     setSubmitting(true);
@@ -303,7 +303,9 @@ export default function InvitePage() {
         <h1 ref={headingRef} tabIndex={-1}>
           Choose a password for {preview.label}
         </h1>
-        <p>{preview.label} can sign in with {preview.email} and this password.</p>
+        <p>
+          {preview.label} can sign in with {preview.email} and this password.
+        </p>
         <Form
           className={styles.form}
           onSubmit={(e) => {
@@ -317,10 +319,18 @@ export default function InvitePage() {
             value={childPassword}
             onChange={setChildPassword}
           >
-            <Label>Password (at least 8 characters)</Label>
-            <Input type={showPassword ? "text" : "password"} autoComplete="new-password" minLength={8} />
+            <Label>Password (at least 6 characters)</Label>
+            <Input
+              type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
+              minLength={6}
+            />
           </TextField>
-          <Button type="button" className={styles.secondary} onPress={() => setShowPassword((value) => !value)}>
+          <Button
+            type="button"
+            className={styles.secondary}
+            onPress={() => setShowPassword((value) => !value)}
+          >
             {showPassword ? "Hide password" : "Show password"}
           </Button>
           {error ? (
@@ -368,15 +378,16 @@ export default function InvitePage() {
           <p>
             This invitation is for {preview.email}. You're signed in as {user?.email}.
           </p>
-          <Button
-            className={styles.primary}
-            onPress={() => void continueAsInvitee(preview)}
-          >
+          <Button className={styles.primary} onPress={() => void continueAsInvitee(preview)}>
             Continue as {preview.label}
           </Button>
         </section>
       ) : session ? (
-        <Button className={styles.primary} isDisabled={submitting} onPress={() => void join(token, preview)}>
+        <Button
+          className={styles.primary}
+          isDisabled={submitting}
+          onPress={() => void join(token, preview)}
+        >
           Join {preview.family_name}
         </Button>
       ) : offline ? (
@@ -394,7 +405,10 @@ export default function InvitePage() {
               >
                 Email me a sign-in code
               </Button>
-              <Link className={styles.secondaryLink} to={`/sign-in?next=/invite&email=${encodeURIComponent(preview.email)}`}>
+              <Link
+                className={styles.secondaryLink}
+                to={`/sign-in?next=/invite&email=${encodeURIComponent(preview.email)}`}
+              >
                 I have a password
               </Link>
             </>

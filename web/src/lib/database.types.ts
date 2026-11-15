@@ -255,6 +255,8 @@ export type Database = {
           created_by: string;
           deleted_at: string | null;
           duration_s: number | null;
+          expected_bytes: number | null;
+          expected_thumb_bytes: number | null;
           family_id: string;
           height: number | null;
           id: string;
@@ -279,6 +281,8 @@ export type Database = {
           created_by: string;
           deleted_at?: string | null;
           duration_s?: number | null;
+          expected_bytes?: number | null;
+          expected_thumb_bytes?: number | null;
           family_id: string;
           height?: number | null;
           id?: string;
@@ -302,6 +306,8 @@ export type Database = {
           created_by?: string;
           deleted_at?: string | null;
           duration_s?: number | null;
+          expected_bytes?: number | null;
+          expected_thumb_bytes?: number | null;
           family_id?: string;
           height?: number | null;
           id?: string;
@@ -744,6 +750,7 @@ export type Database = {
         Args: { p_family_id: string; p_owner_member_id: string; p_title: string };
         Returns: string;
       };
+      delete_photo_orphan_rows: { Args: { p_ids: string[] }; Returns: number };
       invitation_preview: {
         Args: { p_token: string };
         Returns: {
@@ -768,6 +775,19 @@ export type Database = {
           token: string;
         }[];
       };
+      list_photo_orphans: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          media_id: string;
+          object_key: string;
+          thumb_key: string;
+        }[];
+      };
+      mark_media_failed: { Args: { p_media_id: string }; Returns: undefined };
+      mark_media_ready: {
+        Args: { p_bytes: number; p_media_id: string; p_provider: string; p_thumb_bytes: number };
+        Returns: undefined;
+      };
       mark_space_read: { Args: { p_space_id: string }; Returns: undefined };
       my_pending_invitations: {
         Args: Record<PropertyKey, never>;
@@ -786,8 +806,27 @@ export type Database = {
           label: string;
         }[];
       };
+      post_message_with_photos: {
+        Args: { p_body: string; p_media_ids: string[]; p_reply_to_id?: string; p_space_id: string };
+        Returns: string;
+      };
       remove_member: { Args: { p_member_id: string }; Returns: undefined };
       rename_space: { Args: { p_space_id: string; p_title: string }; Returns: undefined };
+      reserve_photo_upload: {
+        Args: {
+          p_bytes: number;
+          p_caption?: string;
+          p_height: number;
+          p_space_id: string;
+          p_thumb_bytes: number;
+          p_width: number;
+        };
+        Returns: {
+          key: string;
+          media_id: string;
+          thumb_key: string;
+        }[];
+      };
       revoke_invitation: { Args: { p_invitation_id: string }; Returns: undefined };
       space_audience: {
         Args: { p_space_id: string };
@@ -812,7 +851,7 @@ export type Database = {
       family_role: "admin" | "grandparent" | "member";
       invitation_status: "pending" | "accepted" | "revoked" | "expired";
       media_kind: "photo" | "video";
-      media_provider: "r2" | "mux";
+      media_provider: "r2" | "mux" | "supabase" | "b2";
       media_status: "pending" | "ready" | "failed";
       member_status: "active" | "removed";
       space_kind: "general" | "member";
@@ -938,7 +977,7 @@ export const Constants = {
       family_role: ["admin", "grandparent", "member"],
       invitation_status: ["pending", "accepted", "revoked", "expired"],
       media_kind: ["photo", "video"],
-      media_provider: ["r2", "mux"],
+      media_provider: ["r2", "mux", "supabase", "b2"],
       media_status: ["pending", "ready", "failed"],
       member_status: ["active", "removed"],
       space_kind: ["general", "member"],

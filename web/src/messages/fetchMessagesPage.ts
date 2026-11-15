@@ -1,3 +1,4 @@
+import { fetchPhotosForMessages } from "../media/fetchPhotos.ts";
 import { olderThanFilter } from "./cache.ts";
 import { getSupabase } from "../lib/supabase.ts";
 import type { FamilyMember } from "../lib/database.helpers.ts";
@@ -49,9 +50,11 @@ export async function fetchMessagesPage(
     }
   }
 
+  const photos = await fetchPhotosForMessages((messages ?? []).map((message) => message.id));
   const items: ThreadMessage[] = (messages ?? []).map((message) => ({
     ...message,
     authorLabel: labels.get(message.author_member_id) ?? "Family member",
+    photos: photos.get(message.id) ?? [],
   }));
 
   const oldest = items.at(-1);
@@ -83,9 +86,11 @@ export async function fetchMessageById(messageId: string): Promise<ThreadMessage
     .eq("id", data.author_member_id)
     .maybeSingle();
 
+  const photos = await fetchPhotosForMessages([data.id]);
   return {
     ...data,
     authorLabel: member?.label ?? "Family member",
+    photos: photos.get(data.id) ?? [],
   };
 }
 
@@ -104,8 +109,10 @@ export async function fetchMessagesByIds(ids: string[]): Promise<ThreadMessage[]
 
   const labels = new Map((members ?? []).map((m) => [m.id, m.label] as const));
 
+  const photos = await fetchPhotosForMessages((data ?? []).map((message) => message.id));
   return (data ?? []).map((message) => ({
     ...message,
     authorLabel: labels.get(message.author_member_id) ?? "Family member",
+    photos: photos.get(message.id) ?? [],
   }));
 }
