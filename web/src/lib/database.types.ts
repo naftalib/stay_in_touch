@@ -817,6 +817,7 @@ export type Database = {
           p_bytes: number;
           p_caption?: string;
           p_height: number;
+          p_provider?: string;
           p_space_id: string;
           p_thumb_bytes: number;
           p_width: number;

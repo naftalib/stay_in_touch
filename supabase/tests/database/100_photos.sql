@@ -4,7 +4,7 @@ select set_config('search_path', 'public, extensions', true);
 
 \ir _fixtures.sql.inc
 
-select plan(41);
+select plan(47);
 
 select is(
   (select public from storage.buckets where id = 'photos'),
@@ -77,6 +77,12 @@ select isnt_empty(
     'b3000000-0000-4000-8000-000000000004', 100, 40, 800, 600, 'Picnic'
   )$$,
   'a grandparent can reserve a photo in Noa''s space'
+);
+
+select is(
+  (select provider::text from public.media where caption = 'Picnic'),
+  'supabase',
+  'a pending reservation records provider supabase'
 );
 
 select test.login('noa@fixture.test');
@@ -281,6 +287,104 @@ select isnt(
   'a blank message is allowed when a ready photo is attached'
 );
 
+-- Deleting the last photo on a blank message soft-deletes the message.
+-- A text message, and a blank message that still has another photo, stay.
+reset role;
+insert into public.messages (
+  id, space_id, family_id, author_member_id, body, created_by
+) values
+  (
+    'b4000000-0000-4000-8000-0000000000b1',
+    'b3000000-0000-4000-8000-000000000004',
+    'b0000000-0000-4000-8000-000000000001',
+    'b2000000-0000-4000-8000-000000000003',
+    '',
+    'b1000000-0000-4000-8000-000000000003'
+  ),
+  (
+    'b4000000-0000-4000-8000-0000000000b2',
+    'b3000000-0000-4000-8000-000000000004',
+    'b0000000-0000-4000-8000-000000000001',
+    'b2000000-0000-4000-8000-000000000003',
+    'Still here',
+    'b1000000-0000-4000-8000-000000000003'
+  );
+
+insert into public.media (
+  id, space_id, family_id, uploader_member_id, message_id, kind, r2_key, thumb_key,
+  content_type, status, provider, created_by, width, height, size_bytes, expected_thumb_bytes
+) values
+  (
+    'b5000000-0000-4000-8000-0000000000b1',
+    'b3000000-0000-4000-8000-000000000004',
+    'b0000000-0000-4000-8000-000000000001',
+    'b2000000-0000-4000-8000-000000000003',
+    'b4000000-0000-4000-8000-0000000000b1',
+    'photo',
+    'f/b0000000-0000-4000-8000-000000000001/s/b3000000-0000-4000-8000-000000000004/b5000000-0000-4000-8000-0000000000b1/original.jpg',
+    'f/b0000000-0000-4000-8000-000000000001/s/b3000000-0000-4000-8000-000000000004/b5000000-0000-4000-8000-0000000000b1/thumb.jpg',
+    'image/jpeg', 'ready', 'supabase',
+    'b1000000-0000-4000-8000-000000000003',
+    80, 60, 100, 40
+  ),
+  (
+    'b5000000-0000-4000-8000-0000000000b2',
+    'b3000000-0000-4000-8000-000000000004',
+    'b0000000-0000-4000-8000-000000000001',
+    'b2000000-0000-4000-8000-000000000003',
+    'b4000000-0000-4000-8000-0000000000b1',
+    'photo',
+    'f/b0000000-0000-4000-8000-000000000001/s/b3000000-0000-4000-8000-000000000004/b5000000-0000-4000-8000-0000000000b2/original.jpg',
+    'f/b0000000-0000-4000-8000-000000000001/s/b3000000-0000-4000-8000-000000000004/b5000000-0000-4000-8000-0000000000b2/thumb.jpg',
+    'image/jpeg', 'ready', 'supabase',
+    'b1000000-0000-4000-8000-000000000003',
+    80, 60, 100, 40
+  ),
+  (
+    'b5000000-0000-4000-8000-0000000000b3',
+    'b3000000-0000-4000-8000-000000000004',
+    'b0000000-0000-4000-8000-000000000001',
+    'b2000000-0000-4000-8000-000000000003',
+    'b4000000-0000-4000-8000-0000000000b2',
+    'photo',
+    'f/b0000000-0000-4000-8000-000000000001/s/b3000000-0000-4000-8000-000000000004/b5000000-0000-4000-8000-0000000000b3/original.jpg',
+    'f/b0000000-0000-4000-8000-000000000001/s/b3000000-0000-4000-8000-000000000004/b5000000-0000-4000-8000-0000000000b3/thumb.jpg',
+    'image/jpeg', 'ready', 'supabase',
+    'b1000000-0000-4000-8000-000000000003',
+    80, 60, 100, 40
+  );
+
+select test.login('grandma@fixture.test');
+set local role authenticated;
+update public.media
+set deleted_at = now()
+where id = 'b5000000-0000-4000-8000-0000000000b1';
+
+select is(
+  (select deleted_at from public.messages where id = 'b4000000-0000-4000-8000-0000000000b1'),
+  null,
+  'a blank message stays while another photo is still attached'
+);
+
+update public.media
+set deleted_at = now()
+where id = 'b5000000-0000-4000-8000-0000000000b2';
+
+select ok(
+  (select deleted_at is not null from public.messages where id = 'b4000000-0000-4000-8000-0000000000b1'),
+  'deleting the last photo soft-deletes a blank message'
+);
+
+update public.media
+set deleted_at = now()
+where id = 'b5000000-0000-4000-8000-0000000000b3';
+
+select is(
+  (select deleted_at from public.messages where id = 'b4000000-0000-4000-8000-0000000000b2'),
+  null,
+  'a message with text stays when its photo is deleted'
+);
+
 select throws_ok(
   $$select public.post_message_with_photos(
     'b3000000-0000-4000-8000-000000000004',
@@ -476,6 +580,23 @@ insert into public.media (
   now() - interval '25 hours'
 );
 
+insert into public.media (
+  id, space_id, family_id, uploader_member_id, kind, r2_key, thumb_key,
+  content_type, status, provider, created_by, created_at, deleted_at
+) values (
+  'b5000000-0000-4000-8000-0000000000d1',
+  'b3000000-0000-4000-8000-000000000001',
+  'b0000000-0000-4000-8000-000000000001',
+  'b2000000-0000-4000-8000-000000000001',
+  'photo',
+  'f/b0000000-0000-4000-8000-000000000001/s/b3000000-0000-4000-8000-000000000001/b5000000-0000-4000-8000-0000000000d1/original.jpg',
+  'f/b0000000-0000-4000-8000-000000000001/s/b3000000-0000-4000-8000-000000000001/b5000000-0000-4000-8000-0000000000d1/thumb.jpg',
+  'image/jpeg', 'pending', 'supabase',
+  'b1000000-0000-4000-8000-000000000001',
+  now() - interval '25 hours',
+  now() - interval '25 hours'
+);
+
 select ok(
   exists (select 1 from public.list_photo_orphans() where media_id = 'b5000000-0000-4000-8000-0000000000c0'),
   'a pending photo older than a day is an orphan'
@@ -483,6 +604,17 @@ select ok(
 select ok(
   exists (select 1 from public.list_photo_orphans() where media_id = 'b5000000-0000-4000-8000-0000000000ff'),
   'an unattached ready photo older than a day is an orphan'
+);
+select ok(
+  exists (select 1 from public.list_photo_orphans() where media_id = 'b5000000-0000-4000-8000-0000000000d1'),
+  'a soft-deleted unattached upload older than a day is an orphan'
+);
+select ok(
+  not exists (
+    select 1 from public.list_photo_orphans()
+    where media_id = 'b5000000-0000-4000-8000-0000000000b1'
+  ),
+  'a soft-deleted photo that is still attached is kept'
 );
 select ok(
   not exists (
