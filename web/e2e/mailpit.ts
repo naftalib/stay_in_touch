@@ -35,11 +35,17 @@ export async function latestEmailTo(
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     const messages = await listMessages();
-    const match = messages.find((message) => {
+    const matches = messages.filter((message) => {
       if (!addressedTo(message, email)) return false;
       if (!message.Created) return true;
       return new Date(message.Created).getTime() >= since.getTime() - 2000;
     });
+    const match = matches.reduce<MailSummary | undefined>((latest, message) => {
+      if (!latest) return message;
+      const a = new Date(latest.Created ?? 0).getTime();
+      const b = new Date(message.Created ?? 0).getTime();
+      return b >= a ? message : latest;
+    }, undefined);
     if (match) {
       const full = await fetch(`${MAILPIT}/api/v1/message/${match.ID}`);
       if (!full.ok) throw new Error(`Mailpit message error ${full.status}`);
