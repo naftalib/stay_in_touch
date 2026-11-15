@@ -14,6 +14,7 @@ import { useMessagesQuery } from "./useMessagesQuery.ts";
 import { useSendMessage } from "./useSendMessage.ts";
 import { useEditMessage } from "./useEditMessage.ts";
 import { useDeleteMessage } from "./useDeleteMessage.ts";
+import { postMessageWithPhotos } from "../media/postPhotos.ts";
 import { compareMessages, removeMessageFromCache } from "./cache.ts";
 import type { ThreadMessage } from "./types.ts";
 import styles from "./Thread.module.css";
@@ -125,6 +126,23 @@ export default function Thread({ familyId, spaceId, spaceTitle, archived }: Thre
     [familyId, memberId, sendMessage],
   );
 
+  const handleSendPhotos = useCallback(
+    async (body: string, mediaIds: string[], replyToId?: string | null) => {
+      await postMessageWithPhotos({
+        p_space_id: spaceId,
+        p_body: body,
+        p_media_ids: mediaIds,
+        ...(replyToId ? { p_reply_to_id: replyToId } : {}),
+      });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.messages(spaceId) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.photos(spaceId) });
+      setAnnouncement(
+        mediaIds.length === 1 ? "1 photo posted" : `${mediaIds.length} photos posted`,
+      );
+    },
+    [queryClient, spaceId],
+  );
+
   const handleEdit = useCallback(
     async (message: ThreadMessage) => {
       await editMessage.mutateAsync(message);
@@ -226,6 +244,8 @@ export default function Thread({ familyId, spaceId, spaceTitle, archived }: Thre
         replyTo={replyTo}
         onCancelReply={() => setReplyTo(null)}
         onSend={handleSend}
+        onSendPhotos={handleSendPhotos}
+        spaceId={spaceId}
       />
 
       <DeleteMessageDialog

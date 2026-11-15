@@ -13,7 +13,7 @@ This index mirrors the old table so existing links to `docs/decisions.md` still 
 | UI (React Aria, CSS Modules) | [0003](./decisions/0003-ui-components-and-css.md) |
 | Hosting (Cloudflare) | [0004](./decisions/0004-hosting-cloudflare.md) |
 | Backend (Supabase) | [0005](./decisions/0005-supabase-backend.md) |
-| Media (R2, signed URLs) | [0006](./decisions/0006-media-cloudflare-r2.md) |
+| Media (R2, signed URLs) | [0006](./decisions/0006-media-cloudflare-r2.md) (superseded for the prototype by [0061](./decisions/0061-supabase-storage-for-photos.md)) |
 | Email and push (Resend, Web Push) | [0007](./decisions/0007-email-and-push.md) |
 | Future FastAPI (`api/`) | [0008](./decisions/0008-future-fastapi-api-folder.md) |
 | Permissions (RLS, Realtime) | [0009](./decisions/0009-permissions-rls-and-realtime.md) |
@@ -87,6 +87,27 @@ This index mirrors the old table so existing links to `docs/decisions.md` still 
 | Child password minimum (6) | [0058](./decisions/0058-child-password-minimum.md) |
 | Child email +alias hint only | [0059](./decisions/0059-child-email-alias-hint.md) |
 | Confirm invite users so OTP works with signup closed | [0060](./decisions/0060-invite-user-email-confirmed.md) |
+
+## Photos (handoff 05)
+
+| Topic | ADR |
+|---|---|
+| Supabase Storage for the prototype | [0061](./decisions/0061-supabase-storage-for-photos.md) |
+| Storage provider modules | [0062](./decisions/0062-media-provider-modules.md) |
+| Signed upload links | [0063](./decisions/0063-signed-upload-links.md) |
+| Signed view links | [0064](./decisions/0064-signed-view-links.md) |
+| Browser JPEG resize and lazy HEIC | [0065](./decisions/0065-browser-jpeg-and-heic.md) |
+| Reserve, then post the photos together | [0066](./decisions/0066-reserve-then-post-photos.md) |
+| Photo limits | [0067](./decisions/0067-photo-limits.md) |
+| Daily orphan cleanup | [0068](./decisions/0068-photo-orphan-cleanup.md) |
+| Realtime payloads are ids only | [0069](./decisions/0069-realtime-ids-only.md) |
+| Video stays out of this handoff | [0070](./decisions/0070-video-deferred.md) |
+| Photos bucket created by migration | [0071](./decisions/0071-photos-bucket-migration.md) |
+| A blank message needs a photo | [0072](./decisions/0072-blank-message-needs-photo.md) |
+| Orphan job scheduled when Vault secrets exist | [0073](./decisions/0073-orphan-schedule-when-configured.md) |
+| Pending rows record the configured provider | [0074](./decisions/0074-pending-media-provider.md) |
+| Signed GET caching uses Expires | [0075](./decisions/0075-signed-get-expires.md) |
+| Unattached soft-deletes are orphans | [0076](./decisions/0076-unattached-soft-delete-orphans.md) |
 
 ## Future additions
 

@@ -120,22 +120,25 @@ test("two messages with the same timestamp both appear once", async ({ page }) =
     on conflict (id) do nothing;
   `);
   await signInWithPassword(page, SEED_USERS.mom);
-  for (let i = 0; i < 8; i += 1) {
-    const done = await page.evaluate(() => {
-      const scroller = document.querySelector("[data-thread-scroller]");
-      if (!(scroller instanceof HTMLElement)) return false;
-      if (scroller.innerText.includes("Beginning of the thread")) return true;
-      const button = [...scroller.querySelectorAll("button")].find((item) =>
+  const scroller = page.locator("[data-thread-scroller]");
+  await expect(scroller).toBeVisible();
+  await expect(page.getByText("Welcome to the family.", { exact: true })).toBeVisible();
+  for (let i = 0; i < 12; i += 1) {
+    if ((await scroller.innerText()).includes("Beginning of the thread")) break;
+    await expect(scroller.getByRole("button", { name: "Load older messages" })).toBeAttached();
+    // The button sits above the scrolled-to-end thread. A real click waits to
+    // scroll it into view, and the list snaps back to the bottom.
+    await scroller.evaluate((node) => {
+      const button = [...node.querySelectorAll("button")].find((item) =>
         item.textContent?.includes("Load older messages"),
       );
       if (button instanceof HTMLButtonElement) button.click();
-      return false;
     });
-    if (done) break;
-    await expect(page.getByRole("button", { name: "Loading older messages…" })).toHaveCount(0);
+    await expect(scroller.getByRole("button", { name: "Loading older messages…" })).toHaveCount(0);
   }
-  await expect(page.getByText("tie-alpha", { exact: true })).toHaveCount(1);
-  await expect(page.getByText("tie-beta", { exact: true })).toHaveCount(1);
+  await expect(scroller.getByText("Beginning of the thread")).toBeVisible();
+  await expect(scroller.getByText("tie-alpha", { exact: true })).toHaveCount(1);
+  await expect(scroller.getByText("tie-beta", { exact: true })).toHaveCount(1);
 });
 
 test("an archived space has no composer", async ({ page }) => {

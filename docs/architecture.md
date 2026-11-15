@@ -2,7 +2,7 @@
 
 ## Overview
 
-Stay In Touch is a private, invite-only family social app: one family per tenant, spaces for General, each parent, and each child, with grandparents able to visit every space. The repo has the **database layer**, **first web screens**, and **invite email + admin tools** (handoff 04); media upload, notification digests, and push remain planned.
+Stay In Touch is a private, invite-only family social app: one family per tenant, spaces for General, each parent, and each child, with grandparents able to visit every space. The repo has the database, signed-in screens, invite email, admin tools, and photo upload (handoff 05). Notification digests, push, and video remain planned.
 
 ```mermaid
 flowchart LR
@@ -11,13 +11,14 @@ flowchart LR
   end
   subgraph cf["Cloudflare (planned)"]
     Pages["Static / PWA host"]
-    R2["R2 object storage"]
+    R2["R2 later<br/>(provider module)"]
   end
   subgraph supa["Supabase (in repo today)"]
     Auth["Auth"]
     PG["Postgres + RLS"]
-    RT["Realtime Broadcast"]
-    EF["Edge Functions<br/>(invite-send)"]
+    ST["Storage<br/>private photos bucket"]
+    RT["Realtime Broadcast<br/>ids only"]
+    EF["Edge Functions<br/>invite-send + media"]
   end
   subgraph notify["Notifications (planned)"]
     Resend["Resend SMTP"]
@@ -29,10 +30,11 @@ flowchart LR
   Web --> Pages
   Web --> Auth
   Web --> PG
+  Web --> ST
   Web --> RT
-  Web -.-> EF
-  EF -.-> R2
-  EF -.-> PG
+  Web --> EF
+  EF --> ST
+  EF --> PG
   EF -.-> Auth
   Auth -.-> Resend
   Web -.-> Push
@@ -41,9 +43,9 @@ flowchart LR
 
 | Folder | Responsibility | Status |
 |---|---|---|
-| `web/` | PWA UI, Supabase client, accessibility-first components | **Auth, shell, threads, invite, admin** |
+| `web/` | PWA UI, Supabase client, accessibility-first components | **Auth, shell, threads, photos, invite, admin** |
 | `supabase/` | Migrations, seed, pgTAP tests, local CLI config | **Implemented** |
-| `supabase/functions/` | `invite-send`, shared email + templates; later media/outbox | **`invite-send`** |
+| `supabase/functions/` | `invite-send`, media upload/finish/view/cleanup | **Implemented** |
 | `api/` | Later AI / Python services | README only |
 | `docs/` | Architecture, ADRs, build log, hosted checklist | Living docs |
 | `.github/workflows/` | Web unit tests, E2E vs local Supabase, database CI | **Implemented** |
@@ -60,6 +62,7 @@ For roles, tables, RLS, RPCs, and Realtime behavior, see the sections below. Pla
 | `shell/` | `AppShell`, `SideNav`, `buildNav`, drawer, tabs, connection banner |
 | `spaces/` | Space page, Members/Spaces admin, unavailable screen, audience line |
 | `messages/` | Thread, composer, cache merge, realtime refetch by id |
+| `media/` | Resize, HEIC fallback, upload, Pics tab, viewer |
 | `settings/` | Text size control (`data-text-size` on `<html>`) |
 | `ui/` | Thin React Aria wrappers |
 | `lib/` | Typed Supabase singleton, TanStack Query client, query keys, errors |
@@ -75,8 +78,8 @@ Stay In Touch is a private, invite-only family app. One family has a General spa
 ## Stack
 
 - Frontend: Vite, React, TypeScript (`strict`), React Aria Components, CSS Modules. No Tailwind. The app will become a PWA and move to Cloudflare later.
-- Backend: Supabase only. Postgres with row-level security, Auth, Realtime Broadcast, and Edge Functions (not written yet).
-- Media: Cloudflare R2 later. The database stores object keys, never URLs. A later Edge Function will mint a short-lived signed URL after an RLS check.
+- Backend: Supabase. Postgres with row-level security, Auth, Realtime Broadcast, Storage, and Edge Functions.
+- Media: private Supabase Storage bucket `photos` for the prototype (ADR 0061). The database stores object keys, never URLs. R2 and B2 are provider modules, not wired to a bucket yet.
 - Email and push later: Resend as Auth SMTP, Web Push via VAPID.
 - A FastAPI service on Cloud Run is reserved under `api/` and is not built.
 
@@ -103,7 +106,7 @@ UUID primary keys. `created_at` and `updated_at` on every table (`updated_at` is
 | `family_members` | `(family_id, user_id)` unique. Role, label, `active` or `removed`. |
 | `spaces` | `general` or `member`. One General per family. At most one space per owner. Owner must be in that family. |
 | `messages` | Flat thread. `reply_to_id` must be in the same space. Soft delete. |
-| `media` | R2 key `f/{family_id}/s/{space_id}/{media_id}/original.{ext}` and optional `thumb.jpg`. `provider` is `r2` or `mux`. |
+| `media` | Key `f/{family_id}/s/{space_id}/{media_id}/original.jpg` and `thumb.jpg`. `provider` is `supabase`, `r2`, `b2`, or `mux`. |
 | `invitations` | Admin-created. Pending, accepted, revoked, or expired. |
 | `space_reads` | `(member_id, space_id)` and `last_read_at`. |
 | `push_subscriptions` | One device row, visible only to that user. |
@@ -130,13 +133,13 @@ Clients have no insert or update grants on memberships, invitations, spaces, or 
 - `create_member_space`, `rename_space`, `archive_space`, `unarchive_space`
 - `accept_invite` — matches the signed-in user's confirmed `auth.users.email`, uses the invitation's role, and creates a space only when the invitation says so. A `+alias` child is a separate user. A parent signs in as that child to accept. They cannot accept the invite while signed in as themselves.
 
-`unread_counts` counts a message and the media attached to it as one item. Media with `message_id` null counts as one item on its own. The caller's own content is skipped, and a soft-deleted message drops that item.
+`unread_counts` counts a message and the ready photos attached to it as one item. Pending and failed media never count. Unattached ready media counts as its own item. The caller's own content is skipped, and a soft-deleted message drops that item.
 
 Read RPCs are security invoker, so RLS still applies: `space_audience`, `unread_counts`, `mark_space_read`.
 
 Authors can edit their own body or caption and soft-delete. Admins can soft-delete anyone's post and cannot change the body. A deleted post cannot be edited or restored by its author. Only an admin can clear `deleted_at`. Other members do not see a soft-deleted row. The author and the family's admins still can: Postgres checks the updated row against the select policy, so the person who deletes it has to be allowed to read it afterwards. Identity columns (`space_id`, `family_id`, author, `created_at`) cannot change after insert. Clients have no `DELETE` grant on content.
 
-Clients cannot set server-owned columns on insert. A message cannot arrive with `edited_at` or `deleted_at` already set. Media inserted by a client is `pending` / `r2`, with no asset id or file metadata. `profiles.avatar_key`, when set, must look like `u/{user_id}/avatar/{file}`.
+Clients cannot set server-owned columns on insert. A message cannot arrive with `edited_at` or `deleted_at` already set. Clients cannot insert `media` directly. `reserve_photo_upload` creates the pending row. `profiles.avatar_key`, when set, must look like `u/{user_id}/avatar/{file}`.
 
 ### Invite flow (handoff 04)
 
@@ -164,12 +167,39 @@ Admin UI routes: `/f/:familyId/members`, `/f/:familyId/spaces`. Public accept ro
 
 ## Realtime
 
-Inserts and updates of `messages` and `media` call `realtime.broadcast_changes()` on the topic `space:<space_id>`. Soft deletes are updates. The broadcast record keeps the id and the space, and omits the body, caption, and object keys. Clients refetch the row under RLS. There is no client insert policy on `realtime.messages`, so clients cannot publish.
+Inserts and updates of `messages` and `media` call `realtime.send` on the topic `space:<space_id>`. Soft deletes are updates. The payload record is `{ id, space_id }` plus `table` and `operation`. `realtime.send` also adds its own broadcast id. Body, caption, and object keys are absent. Clients refetch the row under RLS. A media notice also refreshes the Pics tab. There is no client insert policy on `realtime.messages`, so clients cannot publish.
 
 The select policy allows `authenticated` only when the extension is `broadcast`, the row's topic equals `realtime.topic()`, and that topic is `space:<id>` for an id in `viewable_space_ids()`. Clients must subscribe with `private: true` and `supabase.realtime.setAuth()`. On a hosted project, turn **Allow public access** off.
 
 Realtime authorizes when the client joins and keeps that decision until the JWT is refreshed or the socket reconnects. REST access ends in the same transaction as `remove_member`. A socket that was already open can still receive the minimal notice. It cannot read the post. Keep `jwt_expiry` short on the hosted project.
 
+## Photos (handoff 05)
+
+Limits, enforced in SQL: JPEG, 5 MB per file, 10 photos per post, 100 media rows per member per rolling day, 800 MB app-wide (`private.app_limits`). `reserve_photo_upload` holds advisory lock `83427601` until the transaction ends. The reservation stores `media.provider` from `MEDIA_PROVIDER` (default `supabase`). Pending and failed rows are visible only to the uploader. A blank message is allowed only while a photo is attached; deleting its last photo soft-deletes the message. Signed view URLs are reused for about 50 minutes. storage-api's signed GET sends `Expires` at the token end and does not echo the object's `Cache-Control`.
+
+Provider modules live in `supabase/functions/_shared/media/`. `MEDIA_PROVIDER=supabase` is the tested path. `r2` and `b2` share the S3 module and are unit-tested only.
+
+```mermaid
+sequenceDiagram
+  participant Browser
+  participant EF as media functions
+  participant PG as Postgres
+  participant ST as Storage photos
+  Browser->>Browser: Resize to JPEG<br/>2048 and 400, no EXIF
+  Browser->>EF: media-upload-url
+  EF->>PG: reserve_photo_upload
+  EF-->>Browser: Signed PUT targets
+  Browser->>ST: PUT original and thumb
+  Browser->>EF: media-finish
+  EF->>ST: HEAD both objects
+  EF->>PG: mark_media_ready
+  Browser->>PG: post_message_with_photos
+  Browser->>EF: media-view-urls
+  EF-->>Browser: Signed GET links, 1 hour
+```
+
+`media-cleanup` runs with `x-media-cleanup-secret` and deletes orphan objects older than 24 hours, including soft-deleted uploads that were never attached to a message. Attached photos stay so an admin can restore them. The Video tab is hidden. `/video` redirects to messages.
+
 ## Media flow (later)
 
-The client will insert a `media` row in `pending`, upload bytes to the key stored on that row, and an Edge Function will mark it `ready` and hand out a signed URL. This handoff only stores the key.
+Video storage is not chosen. R2 or B2 can replace the Supabase bucket by changing `MEDIA_PROVIDER` and copying objects. The database already stores keys only.

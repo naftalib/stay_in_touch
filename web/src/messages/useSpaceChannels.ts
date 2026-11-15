@@ -127,6 +127,13 @@ export function useSpaceChannels(
           const body = payload.payload ?? {};
           const notice = noticeFrom(body);
           if (!notice) return;
+          if (notice.table === "media") {
+            const target = notice.spaceId ?? spaceId;
+            void queryClient.invalidateQueries({ queryKey: queryKeys.photos(target) });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.messages(target) });
+            scheduleUnread();
+            return;
+          }
           if (notice.table && notice.table !== "messages") {
             scheduleUnread();
             return;

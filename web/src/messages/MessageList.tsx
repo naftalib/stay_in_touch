@@ -140,6 +140,7 @@ export default function MessageList({
                   onScrollToQuote={itemProps.onScrollToQuote}
                   onRetry={itemProps.onRetry}
                   onRemoveFailed={itemProps.onRemoveFailed}
+                  memberId={itemProps.memberId}
                 />
               </li>
             );

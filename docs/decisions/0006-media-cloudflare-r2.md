@@ -14,7 +14,7 @@ R2 for media. Database stores object keys only. A future Edge Function mints sig
 No egress fees on R2. Media upload flow is documented as future work in architecture. `provider` enum already includes `mux`.
 
 ## Status
-Accepted (storage not wired yet)
+Superseded for the prototype by [ADR 0061](./0061-supabase-storage-for-photos.md). The decision text above is unchanged: R2 remains the path if the family later leaves Supabase Storage.
 
 ## Date
 2026-11-12
