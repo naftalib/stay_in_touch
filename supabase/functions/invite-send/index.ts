@@ -110,7 +110,8 @@ export default {
       }
       console.error("invite-send error", message);
       const url = Deno.env.get("SUPABASE_URL") ?? "";
-      const localDev = url.includes("127.0.0.1") || url.includes("localhost") || url.includes("kong");
+      const localDev = url.includes("127.0.0.1") || url.includes("localhost") ||
+        url.includes("kong");
       return Response.json(
         { error: localDev ? message : "Could not send invitation." },
         { status: 500 },

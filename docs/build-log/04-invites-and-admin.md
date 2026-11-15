@@ -69,6 +69,10 @@ Pending Grok 4.7 review.
 
 - Dropped `supabase functions serve` from the e2e job so Kong routes to the stack edge runtime (with `MAILPIT_URL=http://inbucket:8025`), not a second worker using loopback Mailpit from `.env.example`. Local `invite-send` returns the underlying error message for easier CI diagnosis.
 
+## CI fix round 8 (Nov 15)
+
+- E2e setup flakiness: GitHub runners sometimes leave Supabase ports busy (54322/54324). Prep step removes `supabase_*` containers and kills bound ports before each `supabase start` attempt.
+
 ## Follow-ups carried forward
 
 - Expand Playwright to full spec §10 list and axe matrix on new screens.
