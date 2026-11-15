@@ -86,6 +86,7 @@ This index mirrors the old table so existing links to `docs/decisions.md` still 
 | Orphan invite auth cleanup | [0057](./decisions/0057-orphan-invite-auth-cleanup.md) |
 | Child password minimum (6) | [0058](./decisions/0058-child-password-minimum.md) |
 | Child email +alias hint only | [0059](./decisions/0059-child-email-alias-hint.md) |
+| Confirm invite users so OTP works with signup closed | [0060](./decisions/0060-invite-user-email-confirmed.md) |
 
 ## Future additions
 

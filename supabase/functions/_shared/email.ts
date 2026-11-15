@@ -19,35 +19,74 @@ function supabaseUrl(): string {
 }
 
 function isLocalSupabaseUrl(): boolean {
+  const raw = supabaseUrl();
+  if (!raw) return true;
+  let host = "";
+  let protocol = "";
+  try {
+    const url = new URL(raw);
+    host = url.hostname.toLowerCase();
+    protocol = url.protocol;
+  } catch {
+    return false;
+  }
+  if (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host === "0.0.0.0" ||
+    host === "kong" ||
+    host === "host.docker.internal" ||
+    host.includes("supabase_kong")
+  ) {
+    return true;
+  }
+  if (host.endsWith(".local") || host.endsWith(".internal")) return true;
+  // Docker DNS names on the local stack are single labels over http.
+  return protocol === "http:" && !host.includes(".");
+}
+
+function insideDockerNetwork(): boolean {
   const url = supabaseUrl();
-  if (!url) return true;
-  if (url.includes("127.0.0.1") || url.includes("localhost")) return true;
-  // Edge runtime inside the local Supabase Docker network talks to Kong, not loopback.
-  if (url.includes("kong") || url.includes("supabase_kong")) return true;
-  return false;
+  return !url || url.includes("kong") || url.includes("supabase_kong");
 }
 
 function mailpitBaseUrl(): string {
-  const configured = Deno.env.get("MAILPIT_URL");
-  if (configured) return configured.replace(/\/$/, "");
-  const url = supabaseUrl();
-  if (url.includes("kong") || url.includes("supabase_kong") || !url) {
-    return "http://inbucket:8025";
-  }
+  const configured = Deno.env.get("MAILPIT_URL")?.replace(/\/$/, "");
+  const loopback = configured ? /127\.0\.0\.1|localhost|\[::1\]/.test(configured) : false;
+  // `.env.example` uses the host port. That address is the container itself
+  // once the function runs on the Supabase Docker network.
+  if (configured && !(insideDockerNetwork() && loopback)) return configured;
+  if (insideDockerNetwork()) return "http://inbucket:8025";
   return "http://127.0.0.1:54324";
+}
+
+function parseMailbox(raw: string): { Name: string; Email: string } {
+  const match = raw.match(/^(.*)<([^>]+)>\s*$/);
+  if (!match) return { Name: "", Email: raw.trim() };
+  return {
+    Name: match[1].trim().replaceAll(/^["']|["']$/g, ""),
+    Email: match[2].trim(),
+  };
+}
+
+function smtpSafe(value: string, label: string): string {
+  if (/[\r\n]/.test(value)) {
+    throw new Error(`Invalid email ${label}`);
+  }
+  return value;
 }
 
 async function sendViaMailpit(input: SendEmailInput): Promise<void> {
   if (!isLocalSupabaseUrl()) {
     throw new Error("Mailpit transport is only allowed for local Supabase");
   }
-  const from = Deno.env.get("EMAIL_FROM") ?? "Stay In Touch <no-reply@example.test>";
-  const fromMatch = from.match(/^(.+?)\s*<([^>]+)>$/);
-  const fromEmail = fromMatch?.[2] ?? from;
-  const fromName = fromMatch?.[1]?.trim();
+  const from = parseMailbox(
+    Deno.env.get("EMAIL_FROM") ?? "Stay In Touch <no-reply@example.test>",
+  );
   const body = {
-    From: { Email: fromEmail, ...(fromName ? { Name: fromName } : {}) },
-    To: [{ Email: input.to }],
+    From: from,
+    To: [{ Email: input.to, Name: "" }],
     Subject: input.subject,
     HTML: input.html,
     Text: input.text,
@@ -84,6 +123,14 @@ async function sendViaResend(input: SendEmailInput): Promise<void> {
   if (res.status === 429) {
     throw new Error("Too many emails today. Try again tomorrow.");
   }
+  if (res.status === 401) {
+    console.error("Resend rejected the API key");
+    throw new Error("Email service rejected the request. Check the sending setup.");
+  }
+  if (res.status === 422) {
+    console.error("Resend could not deliver", await res.text());
+    throw new Error("The invitation email could not be delivered. Check the address.");
+  }
   if (!res.ok) {
     console.error("Resend send failed", res.status, await res.text());
     throw new Error("Could not send email");
@@ -91,11 +138,13 @@ async function sendViaResend(input: SendEmailInput): Promise<void> {
 }
 
 async function sendViaGmail(input: SendEmailInput): Promise<void> {
-  const host = Deno.env.get("GMAIL_SMTP_HOST") ?? "smtp.gmail.com";
+  const host = smtpSafe(Deno.env.get("GMAIL_SMTP_HOST") ?? "smtp.gmail.com", "host");
   const port = Number(Deno.env.get("GMAIL_SMTP_PORT") ?? "465");
-  const user = requireEnv("GMAIL_SMTP_USER");
+  const user = smtpSafe(requireEnv("GMAIL_SMTP_USER"), "user");
   const pass = requireEnv("GMAIL_SMTP_PASS");
-  const from = requireEnv("EMAIL_FROM");
+  const from = smtpSafe(requireEnv("EMAIL_FROM"), "from");
+  const to = smtpSafe(input.to, "to");
+  const subject = smtpSafe(input.subject, "subject");
 
   const conn = await Deno.connectTls({ hostname: host, port });
   const encoder = new TextEncoder();
@@ -138,14 +187,14 @@ async function sendViaGmail(input: SendEmailInput): Promise<void> {
   await expect(235);
   await write(`MAIL FROM:<${user}>`);
   await expect(250);
-  await write(`RCPT TO:<${input.to}>`);
+  await write(`RCPT TO:<${to}>`);
   await expect(250);
   await write("DATA");
   await expect(354);
   const mime = [
     `From: ${from}`,
-    `To: ${input.to}`,
-    `Subject: ${input.subject}`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
     "MIME-Version: 1.0",
     'Content-Type: multipart/alternative; boundary="sit"',
     "",

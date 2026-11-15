@@ -6,6 +6,8 @@ import { getSupabase } from "../lib/supabase.ts";
 import { mapError, type AppError } from "../lib/errors.ts";
 import { rememberRecentAccount } from "./recentAccounts.ts";
 import { safeReturnPath } from "./safeReturnPath.ts";
+import { useOnlineStatus } from "../shell/useOnlineStatus.ts";
+import ConnectionBanner from "../shell/ConnectionBanner.tsx";
 import styles from "./InvitePage.module.css";
 
 const TOKEN_KEY = "stay-invite-token";
@@ -33,7 +35,8 @@ function readTokenFromLocation(): string | null {
 }
 
 export default function InvitePage() {
-  const { session, user, signOut } = useAuth();
+  const { session, user, signOut, displayName } = useAuth();
+  const { offline } = useOnlineStatus();
   const navigate = useNavigate();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [state, setState] = useState<PageState>({ kind: "loading" });
@@ -43,17 +46,24 @@ export default function InvitePage() {
   const [submitting, setSubmitting] = useState(false);
   const [showChildPassword, setShowChildPassword] = useState(false);
   const [childPassword, setChildPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordReady, setPasswordReady] = useState(false);
   const [joinedFamilyId, setJoinedFamilyId] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = readTokenFromLocation();
-    if (!token) {
-      setState({ kind: "unknown" });
-      return;
+    function loadFromLocation() {
+      const token = readTokenFromLocation();
+      if (!token) {
+        setState({ kind: "unknown" });
+        return;
+      }
+      sessionStorage.setItem(TOKEN_KEY, token);
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+      void loadPreview(token);
     }
-    sessionStorage.setItem(TOKEN_KEY, token);
-    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
-    void loadPreview(token);
+    loadFromLocation();
+    window.addEventListener("hashchange", loadFromLocation);
+    return () => window.removeEventListener("hashchange", loadFromLocation);
   }, []);
 
   useEffect(() => {
@@ -166,8 +176,8 @@ export default function InvitePage() {
   }
 
   async function saveChildPassword() {
-    if (childPassword.length < 6) {
-      setError({ title: "Choose at least 6 characters." });
+    if (childPassword.length < 8) {
+      setError({ title: "Choose at least 8 characters." });
       return;
     }
     setSubmitting(true);
@@ -177,20 +187,39 @@ export default function InvitePage() {
       setError(mapError(pwError));
       return;
     }
-    if (joinedFamilyId) {
-      navigate(`/f/${joinedFamilyId}`, { replace: true });
-    }
+    setPasswordReady(true);
   }
 
   async function continueAsInvitee(preview: Preview) {
+    if (user?.email) {
+      const name = displayName || user.email;
+      rememberRecentAccount({ email: user.email, displayName: name });
+      sessionStorage.setItem(
+        "stay-return-account",
+        JSON.stringify({ email: user.email, displayName: name }),
+      );
+    }
     sessionStorage.setItem(TOKEN_KEY, state.kind === "pending" ? state.token : "");
+    sessionStorage.setItem("stay-return-to-invite", "1");
     await signOut();
     setState({ kind: "pending", preview, token: state.kind === "pending" ? state.token : "" });
+  }
+
+  function returnAccountName(fallback: string): string {
+    try {
+      const raw = sessionStorage.getItem("stay-return-account");
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw) as { displayName?: string };
+      return parsed.displayName || fallback;
+    } catch {
+      return fallback;
+    }
   }
 
   if (state.kind === "loading") {
     return (
       <main className={styles.page}>
+        {offline ? <ConnectionBanner offline /> : null}
         <h1 ref={headingRef} tabIndex={-1}>
           Checking your invitation…
         </h1>
@@ -238,13 +267,39 @@ export default function InvitePage() {
   }
 
   const { preview, token } = state;
-  const signedInEmail = user?.email?.toLowerCase();
-  const inviteEmail = preview.email.toLowerCase();
+  const signedInEmail = user?.email?.trim().toLowerCase();
+  const inviteEmail = preview.email.trim().toLowerCase();
   const wrongAccount = Boolean(signedInEmail && signedInEmail !== inviteEmail);
+
+  if (showChildPassword && passwordReady) {
+    const backTo = returnAccountName("the previous account");
+    return (
+      <main className={styles.page}>
+        <h1 ref={headingRef} tabIndex={-1}>
+          {preview.label} is ready
+        </h1>
+        <p>
+          {preview.label} can now sign in with {preview.email} and this password.
+        </p>
+        <div className={styles.actions}>
+          <Button
+            className={styles.primary}
+            onPress={() => joinedFamilyId && navigate(`/f/${joinedFamilyId}`, { replace: true })}
+          >
+            Stay signed in as {preview.label}
+          </Button>
+          <Button className={styles.secondary} onPress={() => void signOut()}>
+            Switch back to {backTo}
+          </Button>
+        </div>
+      </main>
+    );
+  }
 
   if (showChildPassword) {
     return (
       <main className={styles.page}>
+        {offline ? <ConnectionBanner offline /> : null}
         <h1 ref={headingRef} tabIndex={-1}>
           Choose a password for {preview.label}
         </h1>
@@ -262,9 +317,12 @@ export default function InvitePage() {
             value={childPassword}
             onChange={setChildPassword}
           >
-            <Label>Password (at least 6 characters)</Label>
-            <Input type="password" autoComplete="new-password" />
+            <Label>Password (at least 8 characters)</Label>
+            <Input type={showPassword ? "text" : "password"} autoComplete="new-password" minLength={8} />
           </TextField>
+          <Button type="button" className={styles.secondary} onPress={() => setShowPassword((value) => !value)}>
+            {showPassword ? "Hide password" : "Show password"}
+          </Button>
           {error ? (
             <p role="alert" className={styles.error}>
               {error.title}
@@ -289,6 +347,7 @@ export default function InvitePage() {
 
   return (
     <main className={styles.page}>
+      {offline ? <ConnectionBanner offline /> : null}
       <h1 ref={headingRef} tabIndex={-1}>
         Join {preview.family_name}
       </h1>
@@ -319,6 +378,10 @@ export default function InvitePage() {
       ) : session ? (
         <Button className={styles.primary} isDisabled={submitting} onPress={() => void join(token, preview)}>
           Join {preview.family_name}
+        </Button>
+      ) : offline ? (
+        <Button className={styles.primary} onPress={() => void loadPreview(token)}>
+          Try again
         </Button>
       ) : (
         <section className={styles.panel}>

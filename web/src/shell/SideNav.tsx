@@ -105,9 +105,9 @@ export default function SideNav({
           <p className={styles.signedInAs}>Signed in as {userLabel}</p>
         ) : null}
         <TextSizeControl />
-        <Link className={styles.switchAccount} to="/sign-in?signedOut=1">
+        <Button className={styles.switchAccount} onPress={onSignOut}>
           Switch account
-        </Link>
+        </Button>
         <Button className={styles.signOut} onPress={onSignOut}>
           Sign out
         </Button>

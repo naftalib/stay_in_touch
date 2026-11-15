@@ -7,6 +7,7 @@ import { useAllMembers } from "../family/useAllMembers.ts";
 import { getSupabase } from "../lib/supabase.ts";
 import { queryKeys } from "../lib/queryKeys.ts";
 import { mapError, type AppError } from "../lib/errors.ts";
+import ConfirmDialog, { type ConfirmRequest } from "../ui/ConfirmDialog.tsx";
 import styles from "./SpacesAdminPage.module.css";
 
 export default function SpacesAdminPage() {
@@ -18,6 +19,9 @@ export default function SpacesAdminPage() {
   const [error, setError] = useState<AppError | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [selectedMember, setSelectedMember] = useState("");
+  const [confirm, setConfirm] = useState<(ConfirmRequest & { run: () => Promise<void> }) | null>(
+    null,
+  );
 
   const ownerLabels = useMemo(() => {
     const map = new Map<string, string>();
@@ -56,10 +60,7 @@ export default function SpacesAdminPage() {
     await invalidate();
   }
 
-  async function archive(spaceId: string, title: string) {
-    if (!window.confirm(`Archive ${title}? Members can still read it; new posts are blocked.`)) {
-      return;
-    }
+  async function archive(spaceId: string) {
     const { error: rpcError } = await getSupabase().rpc("archive_space", { p_space_id: spaceId });
     if (rpcError) {
       setError(mapError(rpcError));
@@ -131,9 +132,31 @@ export default function SpacesAdminPage() {
             </p>
             <div className={styles.rowActions}>
               {space.archived_at ? (
-                <Button onPress={() => void unarchive(space.id)}>Unarchive</Button>
+                <Button
+                  onPress={() =>
+                    setConfirm({
+                      title: `Restore ${space.title}?`,
+                      body: "People will be able to post in this space again.",
+                      confirmLabel: "Unarchive",
+                      run: () => unarchive(space.id),
+                    })
+                  }
+                >
+                  Unarchive
+                </Button>
               ) : space.kind !== "general" ? (
-                <Button onPress={() => void archive(space.id, space.title)}>Archive</Button>
+                <Button
+                  onPress={() =>
+                    setConfirm({
+                      title: `Archive ${space.title}?`,
+                      body: "Members can still read it. New posts are blocked.",
+                      confirmLabel: "Archive",
+                      run: () => archive(space.id),
+                    })
+                  }
+                >
+                  Archive
+                </Button>
               ) : null}
             </div>
           </li>
@@ -169,6 +192,14 @@ export default function SpacesAdminPage() {
           </Form>
         </section>
       ) : null}
+      <ConfirmDialog
+        request={confirm}
+        onClose={(confirmed) => {
+          const run = confirm?.run;
+          setConfirm(null);
+          if (confirmed && run) void run();
+        }}
+      />
     </main>
   );
 }

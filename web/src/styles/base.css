@@ -44,6 +44,19 @@ a:focus-visible {
 
 button {
   font: inherit;
+  /* WebKit otherwise paints system ButtonFace (#c0c0c0) and ButtonText,
+     which fails contrast when color-scheme is light dark. */
+  appearance: none;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 .sr-only {

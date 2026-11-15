@@ -9,7 +9,7 @@ type MailSummary = {
   Snippet?: string;
 };
 
-type MailMessage = MailSummary & {
+export type MailMessage = MailSummary & {
   HTML?: string;
   Text?: string;
 };
@@ -31,25 +31,27 @@ function addressedTo(message: MailSummary, email: string): boolean {
 export async function latestEmailTo(
   email: string,
   since = new Date(0),
+  accept?: (message: MailMessage) => boolean,
 ): Promise<MailMessage | null> {
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     const messages = await listMessages();
-    const matches = messages.filter((message) => {
-      if (!addressedTo(message, email)) return false;
-      if (!message.Created) return true;
-      return new Date(message.Created).getTime() >= since.getTime() - 2000;
-    });
-    const match = matches.reduce<MailSummary | undefined>((latest, message) => {
-      if (!latest) return message;
-      const a = new Date(latest.Created ?? 0).getTime();
-      const b = new Date(message.Created ?? 0).getTime();
-      return b >= a ? message : latest;
-    }, undefined);
-    if (match) {
+    const candidates = messages
+      .filter((message) => {
+        if (!addressedTo(message, email)) return false;
+        if (!message.Created) return true;
+        return new Date(message.Created).getTime() >= since.getTime() - 2000;
+      })
+      .sort((a, b) => {
+        const left = a.Created ? new Date(a.Created).getTime() : 0;
+        const right = b.Created ? new Date(b.Created).getTime() : 0;
+        return right - left;
+      });
+    for (const match of candidates) {
       const full = await fetch(`${MAILPIT}/api/v1/message/${match.ID}`);
       if (!full.ok) throw new Error(`Mailpit message error ${full.status}`);
-      return (await full.json()) as MailMessage;
+      const message = (await full.json()) as MailMessage;
+      if (!accept || accept(message)) return message;
     }
     await new Promise((resolve) => setTimeout(resolve, 400));
   }

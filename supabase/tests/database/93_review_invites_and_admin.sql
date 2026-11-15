@@ -21,6 +21,7 @@ select is_empty(
     where n.nspname in ('public', 'private')
       and p.proname <> 'invitation_preview'
       and has_function_privilege('anon', p.oid, 'execute')
+      and p.proname <> 'invitation_preview'
   $$,
   'anon cannot execute any public or private function except invitation_preview'
 );

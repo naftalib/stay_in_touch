@@ -21,6 +21,7 @@ import { getSupabase } from "../lib/supabase.ts";
 import { queryKeys } from "../lib/queryKeys.ts";
 import { mapError, type AppError } from "../lib/errors.ts";
 import type { FamilyRole } from "../lib/database.helpers.ts";
+import ConfirmDialog, { type ConfirmRequest } from "../ui/ConfirmDialog.tsx";
 import styles from "./MembersPage.module.css";
 
 const ROLE_LABELS: Record<FamilyRole, string> = {
@@ -39,6 +40,9 @@ export default function MembersPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<AppError | null>(null);
+  const [confirm, setConfirm] = useState<(ConfirmRequest & { run: () => Promise<void> }) | null>(
+    null,
+  );
 
   const activeMembers = useMemo(
     () => (membersQuery.data ?? []).filter((m) => m.status === "active"),
@@ -113,6 +117,7 @@ export default function MembersPage() {
                   setError(err);
                   setStatus(null);
                 }}
+                onConfirm={(request, run) => setConfirm({ ...request, run })}
               />
             </li>
           ))}
@@ -142,7 +147,12 @@ export default function MembersPage() {
                   </Button>
                   <Button
                     onPress={() =>
-                      void revokeInvite(invite.id, setStatus, setError, refresh)
+                      setConfirm({
+                        title: "Cancel this invitation?",
+                        body: "The link will stop working.",
+                        confirmLabel: "Cancel invitation",
+                        run: () => revokeInvite(invite.id, setStatus, setError, refresh),
+                      })
                     }
                   >
                     Cancel invitation
@@ -165,6 +175,15 @@ export default function MembersPage() {
           </ul>
         </details>
       ) : null}
+
+      <ConfirmDialog
+        request={confirm}
+        onClose={(confirmed) => {
+          const run = confirm?.run;
+          setConfirm(null);
+          if (confirmed && run) void run();
+        }}
+      />
 
       <InviteDialog
         familyId={familyId}
@@ -198,10 +217,9 @@ async function resendInvite(
 async function revokeInvite(
   id: string,
   setStatus: (v: string) => void,
-  setError: (v: AppError) => void,
+  setError: (v: AppError | null) => void,
   refresh: () => Promise<void>,
 ) {
-  if (!window.confirm("Cancel this invitation? The link will stop working.")) return;
   const { error } = await getSupabase().rpc("revoke_invitation", { p_invitation_id: id });
   if (error) {
     setError(mapError(error));
@@ -216,23 +234,18 @@ function MemberActions({
   selfId,
   onDone,
   onError,
+  onConfirm,
 }: {
   member: { id: string; label: string; role: FamilyRole };
   selfId: string;
   onDone: (msg: string) => void;
   onError: (err: AppError) => void;
+  onConfirm: (request: ConfirmRequest, run: () => Promise<void>) => void;
 }) {
   const [roleOpen, setRoleOpen] = useState(false);
   const [nextRole, setNextRole] = useState<FamilyRole>(member.role);
 
   async function remove() {
-    if (
-      !window.confirm(
-        `${member.label} will lose access right away. Their messages stay, and their space will be archived.`,
-      )
-    ) {
-      return;
-    }
     const { error } = await getSupabase().rpc("remove_member", { p_member_id: member.id });
     if (error) {
       onError(mapError(error));
@@ -242,11 +255,6 @@ function MemberActions({
   }
 
   async function changeRole() {
-  const note =
-      nextRole === "member"
-        ? "Children only see General and their own space."
-        : "This updates what they can see in the app.";
-    if (!window.confirm(`${note} Change ${member.label} to ${ROLE_LABELS[nextRole]}?`)) return;
     const { error } = await getSupabase().rpc("change_member_role", {
       p_member_id: member.id,
       p_role: nextRole,
@@ -262,7 +270,19 @@ function MemberActions({
   return (
     <div className={styles.rowActions}>
       <Button onPress={() => setRoleOpen(true)}>Change role</Button>
-      <Button onPress={() => void remove()} isDisabled={member.id === selfId}>
+      <Button
+        onPress={() =>
+          onConfirm(
+            {
+              title: `Remove ${member.label}?`,
+              body: `${member.label} will lose access right away. Their messages stay, and you can delete any of them. Their space will be archived.`,
+              confirmLabel: "Remove from family",
+            },
+            remove,
+          )
+        }
+        isDisabled={member.id === selfId && member.role === "admin"}
+      >
         Remove from family
       </Button>
       {roleOpen ? (
@@ -281,7 +301,22 @@ function MemberActions({
                   <option value="member">Child</option>
                 </select>
               </label>
-              <Button className={styles.primary} onPress={() => void changeRole()}>
+              <Button
+                className={styles.primary}
+                onPress={() =>
+                  onConfirm(
+                    {
+                      title: `Change ${member.label} to ${ROLE_LABELS[nextRole]}?`,
+                      body:
+                        nextRole === "member"
+                          ? "Children only see General and their own space."
+                          : "This updates what they can see in the app.",
+                      confirmLabel: "Change role",
+                    },
+                    changeRole,
+                  )
+                }
+              >
                 Save
               </Button>
               <Button onPress={() => setRoleOpen(false)}>Cancel</Button>
@@ -314,15 +349,12 @@ function InviteDialog({
 
   if (!isOpen) return null;
 
-  const defaultCreateSpace = memberRole === "admin" || memberRole === "member";
-
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     onError(null);
     try {
-      const wantsSpace =
-        memberRole === "grandparent" ? false : createSpace || defaultCreateSpace;
+      const wantsSpace = memberRole !== "grandparent" && createSpace;
       const { data: invitationId, error: createError } = await getSupabase().rpc(
         "create_invitation",
         {
@@ -375,7 +407,7 @@ function InviteDialog({
                 onChange={(e) => {
                   const next = e.target.value as FamilyRole;
                   setMemberRole(next);
-                  setCreateSpace(next === "admin" || next === "member");
+                  setCreateSpace(next !== "grandparent");
                 }}
               >
                 <option value="admin">Parent</option>
@@ -384,10 +416,7 @@ function InviteDialog({
               </select>
             </label>
             {memberRole !== "grandparent" ? (
-              <Checkbox
-                isSelected={createSpace || defaultCreateSpace}
-                onChange={setCreateSpace}
-              >
+              <Checkbox isSelected={createSpace} onChange={setCreateSpace}>
                 Give them their own space
               </Checkbox>
             ) : null}

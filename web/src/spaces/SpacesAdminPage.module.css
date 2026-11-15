@@ -26,13 +26,20 @@
 }
 
 .meta {
-  color: var(--color-muted);
+  color: var(--color-text-muted);
   margin: var(--space-2) 0;
 }
 
 .rowActions {
   display: flex;
   gap: var(--space-2);
+}
+
+.rowActions button,
+.titleRow button,
+.create button {
+  min-height: 3rem;
+  padding: 0.5rem 0.9rem;
 }
 
 .create {
@@ -49,6 +56,10 @@
 .primary {
   min-height: 3rem;
   padding: var(--space-3) var(--space-5);
+  background: var(--color-accent);
+  color: var(--color-accent-on);
+  border: none;
+  border-radius: var(--radius-md);
 }
 
 .renameForm {
@@ -68,5 +79,5 @@
 
 .disabledHint {
   font-size: var(--text-sm);
-  color: var(--color-muted);
+  color: var(--color-text-muted);
 }

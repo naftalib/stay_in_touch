@@ -158,7 +158,7 @@ sequenceDiagram
   Invitee->>PG: accept_invitation(token)
 ```
 
-`invitations.token_hash` is never granted to clients. Resend rotates the hash. `private.cleanup_orphan_invite_auth_users` runs on a daily pg_cron schedule when the extension is available.
+`invitations.token_hash` is never granted to clients. Resend rotates the hash. Revoke keeps the hash and sets `status = 'revoked'`, so the old link can say the invitation was cancelled while accept still fails. `invite-send` creates the auth user with the email already confirmed (ADR 0060) because signup is closed. `private.cleanup_orphan_invite_auth_users` runs on a daily pg_cron schedule when the extension is available.
 
 Admin UI routes: `/f/:familyId/members`, `/f/:familyId/spaces`. Public accept route: `/invite` (token in fragment).
 

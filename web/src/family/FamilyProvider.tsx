@@ -9,6 +9,22 @@ import { PendingInvitesPanel } from "./PendingInvitesPanel.tsx";
 import styles from "./FamilyProvider.module.css";
 
 const FamilyContext = createContext<MembershipContext | null>(null);
+const SEEN_FAMILIES_KEY = "stay-families-seen";
+
+function seenFamilies(): string[] {
+  try {
+    const raw = sessionStorage.getItem(SEEN_FAMILIES_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberFamily(familyId: string) {
+  const next = [...new Set([...seenFamilies(), familyId])];
+  sessionStorage.setItem(SEEN_FAMILIES_KEY, JSON.stringify(next));
+}
 
 export function useFamily(): MembershipContext {
   const ctx = useContext(FamilyContext);
@@ -32,12 +48,14 @@ export function FamilyGate() {
   }, [familyId, membershipsQuery.data]);
 
   useEffect(() => {
-    if (membership) {
+    if (membership && familyId) {
       sawAccess.current = true;
+      rememberFamily(familyId);
       return;
     }
-    if (sawAccess.current) setRemoved(true);
-  }, [membership]);
+    if (!familyId || membershipsQuery.isPending || !membershipsQuery.isSuccess) return;
+    if (sawAccess.current || seenFamilies().includes(familyId)) setRemoved(true);
+  }, [familyId, membership, membershipsQuery.isPending, membershipsQuery.isSuccess]);
 
   useEffect(() => {
     if (refreshedEmptySpaces.current) return;
@@ -121,7 +139,26 @@ export function FamilyPicker({ children }: { children?: ReactNode }) {
     );
   }
 
-  const first = membershipsQuery.data?.[0];
+  const memberships = membershipsQuery.data ?? [];
+  if (memberships.length > 1) {
+    return (
+      <main className={styles.empty}>
+        <h1>Your families</h1>
+        <ul className={styles.familyList}>
+          {memberships.map((membership) => (
+            <li key={membership.family_id}>
+              <Link className={styles.familyLink} to={`/f/${membership.family_id}`}>
+                {membership.family.name}
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <PendingInvitesPanel />
+      </main>
+    );
+  }
+
+  const first = memberships[0];
   if (first) {
     return <Navigate to={`/f/${first.family_id}`} replace />;
   }

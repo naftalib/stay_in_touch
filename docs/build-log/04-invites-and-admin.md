@@ -25,18 +25,59 @@ https://github.com/naftalib/stay_in_touch/pull/4
 
 ## Review findings and how each was resolved
 
-Pending Grok 4.7 review.
+See **Review and fixes** below. The builder could not run Docker, so pgTAP, Deno, and Playwright had not actually run before review.
+
+## Review and fixes
+
+Reviewed on 15 Nov 2026 against the handoff spec and the review checklist. Fixes are on `cursor/invites-and-admin-7986`.
+
+### Security
+
+- Invite tokens stay 32 random bytes, stored as SHA-256, single-use for accept, and rotated on resend. `token_hash` is not granted to `authenticated` or `anon`.
+- Accept compares emails with `private.normalized_email()` (trim and case). The role always comes from the invitation. A non-admin, another family's admin, a grandparent, and a child cannot issue tokens.
+- Revoke keeps the hash and sets `status = 'revoked'`, so the old link says the invitation was cancelled and accept still fails. Clearing the hash made every cancelled link look like a random guess.
+- Orphan cleanup still refuses users who have signed in, have a session, have any family membership, or have another pending invite.
+- Removed-member Realtime: after `remove_member`, `refreshSession()`, and `realtime.setAuth()`, a new General post was **not** delivered within 5 seconds, and REST returned no rows. The web client also drops and rejoins channels when the access token changes.
+- `invite-send` builds the link from `APP_URL` only, redacts long token-like strings from logs, and never returns the token.
+
+### What was broken before it could run
+
+- `private.finish_accept_invitation` used `%rowtype` in a parameter list. Postgres rejects that. The parameter is `public.invitations`.
+- `authenticated` has no UPDATE on `invitations`, which is correct. pgTAP that set `last_sent_at` now does it as the table owner.
+- Anon may execute only `invitation_preview`. The catalog test allows that one function.
+- Mailpit's send API expects `From` and `To` as `{ Name, Email }` objects. A display-name string returned HTTP 400, so no invite mail left the function.
+- `auth.admin.createUser({ email_confirm: false })` plus `enable_signup = false` makes `signInWithOtp` return `signup_disabled`. Invite-created users are now created with `email_confirm: true`. Signup stays closed. The OTP still proves the person has the inbox. See ADR 0060.
+- Local CLI 3.1.0 `supabase functions serve --env-file supabase/functions/.env.example` injects those variables into the edge-runtime container. `SUPABASE_URL` there is `http://kong:8000`. Mailpit is reachable at `http://inbucket:8025` from that container (published on the host as port 54324). The host cannot resolve the name `inbucket`.
+
+### Product gaps closed in review
+
+- Accessible confirm dialogs replace `window.confirm` for revoke, remove, role change, archive, and unarchive.
+- Wrong-account "Continue as …" returns to `/invite` after sign-out instead of dumping the person on the sign-in page.
+- A removed member who reloads a family they had opened sees "You no longer have access to this family."
+- Playwright covers the spec §10 journeys, including Mailpit invite accept, the child alias password, the second-family banner, and the Realtime removal probe. axe runs on the invite, members, confirm, and spaces screens in light, dark, and extra-large text.
+- Child password screen asks for 8 characters. Local Auth `minimum_password_length` stays 6.
+- WebKit and iPhone were painting unstyled buttons with system colors (white on `#c0c0c0`). Buttons now set their own background, text color, and `appearance: none`.
+- On a phone, sign-out no longer clicks the Spaces button while the drawer is already open (that button is inert behind the modal).
+- Member and invite helper text uses `--color-text-muted`. `--color-muted` is not a token, so those lines were inheriting the body color.
+
+### Tests run locally
+
+- pgTAP: 22 files, 376 tests, pass.
+- Deno: 11 tests, pass (`deno fmt`, `deno lint`, `deno check`, `deno test --allow-env`).
+- Web: oxlint, `tsc`, Vitest 22 tests, pass.
+- Playwright: 120 passed in 6.5 minutes on Chromium, WebKit, and iPhone 13 (local `pnpm dev`, Mailpit on port 54324), including `z-removed-member.spec.ts`. The invite file resets the database when it finishes so later files still see the seed.
 
 ## Deviations from the plan and why
 
-- **Local stack:** This build environment has no Docker, so the full stack was not run locally before push; validation is via CI (max three fix rounds if needed).
-- **E2E breadth:** Playwright covers core invite and admin gates; not every scenario in spec §10 is automated yet (resend/revoke chains, full axe matrix, child-alias journey).
+- **Local stack:** The builder's environment had no Docker, so the full stack was not run before the first push. Review ran `supabase start`, `supabase functions serve`, pgTAP, Deno, and Playwright locally.
+- **E2E breadth:** The first push covered the core invite and admin gates. Review added the spec §10 journeys (resend and cancel, expiry, child alias, second family, Realtime after removal, axe on the new screens).
 - **Gmail SMTP:** Transport stub exists in `sendEmail()`; hosted prototype wiring is documented; CI uses Mailpit only.
 
 ## Open questions and decisions made
 
-- **`email_confirm: false` on `auth.admin.createUser`:** Used for invite-created users; E2E relies on OTP + `verifyOtp` to confirm (see ADR 0048).
-- **Realtime after removal:** Client unsubscribes all channels on `TOKEN_REFRESHED`; dedicated Realtime drop test still TODO in Playwright (see ADR 0056).
+- **`email_confirm`:** `false` does not work with public signup disabled. OTP to an unconfirmed invite user is rejected as `signup_disabled`. Invite-created users are created with `email_confirm: true` (ADR 0060). The code form opens only after GoTrue accepts the send. A send error stays on the invite preview.
+- **Realtime after removal:** After `remove_member`, `refreshSession()`, and `realtime.setAuth()`, the next General post was not delivered and REST returned no rows. The client also rejoins channels when the access token changes (ADR 0056). Playwright covers this.
+- **CLI 3.1.0 function env:** The stack edge runtime reads `MAILPIT_URL`. From that container Mailpit is `http://inbucket:8025`. The host inbox is `http://127.0.0.1:54324`. `.env.example` keeps the host URL for a host-side `functions serve`.
 - **CI job durations (run [43729437566](https://github.com/naftalib/stay_in_touch/actions/runs/43729437566) on `02f00e7`, after pgTAP/types fixes):** web ~24s, functions ~10s, db ~77s; e2e failed on Playwright (invite helper double-read of `fetch` body; one webkit sign-in flake).
 
 ## CI fix round 2 (Nov 15)
@@ -81,10 +122,16 @@ Pending Grok 4.7 review.
 
 - `InvitePage.sendCode` mirrors sign-in OTP: show the code form unless rate-limited (invitee auth user already exists). E2E uses the full button label and `textbox` role for the code field.
 
+## Review rebase (Nov 15)
+
+Rebased the review onto the CI fix rounds above. Invite users are created already confirmed (ADR 0060). Revoke keeps the token hash and sets `status = 'revoked'`. A loopback `MAILPIT_URL` is ignored when the function is running on the Docker network, so host `.env.example` does not point the edge runtime at itself. Playwright after this rebase: 120 passed in 6.5 minutes. The invite file still resets the database when it finishes so later specs see the seed. `z-removed-member.spec.ts` remains as a last-file REST check.
+
 ## Follow-ups carried forward
 
-- Expand Playwright to full spec §10 list and axe matrix on new screens.
-- Hosted Resend domain go-live (switch `EMAIL_TRANSPORT` only).
-- Audit-log viewer, label edits, family settings UI.
-- Slim Realtime payload to ids only (already consumed that way in the UI).
-- Delete auth users for never-accepted invites (partially addressed by orphan cleanup job).
+- Hosted Resend domain go-live (switch `EMAIL_TRANSPORT` only). No Resend key is in the repo or CI.
+- Turn on hosted Auth email confirmation and set JWT expiry to 600 seconds (documented in `docs/hosted-settings.md`). Local confirmation stays off and local JWT expiry stays 3600 seconds.
+- Gmail SMTP is implemented and unit-tested, and has not been sent through a real Gmail account.
+- Audit-log viewer, label edits, and family settings UI.
+- Slim Realtime payload to ids only (the UI already reads it that way).
+- Leaked-password protection on the child password screen is a paid Supabase feature and is not enabled locally.
+- Orphan cleanup does not delete auth users who still have a pending invite. That is intentional.

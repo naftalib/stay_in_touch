@@ -60,16 +60,19 @@ export async function signInWithPassword(page: import("@playwright/test").Page, 
   });
 }
 
-/** Opens the Spaces drawer on narrow viewports. */
+/** Opens the Spaces drawer on narrow viewports. A second call is a no-op while the drawer is already open; the opener sits behind the modal and is inert. */
 export async function ensureSpacesNavOpen(page: import("@playwright/test").Page) {
+  const nav = page.getByRole("navigation", { name: "Spaces" });
+  if (await nav.isVisible()) return;
+
   const drawerOpener = page.getByRole("button", { name: "Spaces" });
   if (await drawerOpener.isVisible()) {
     await drawerOpener.click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    const nav = dialog.getByRole("navigation", { name: "Spaces" });
-    await expect(nav).toBeVisible();
-    await expect(nav.getByRole("link").first()).toBeVisible({ timeout: 15_000 });
+    const drawerNav = dialog.getByRole("navigation", { name: "Spaces" });
+    await expect(drawerNav).toBeVisible();
+    await expect(drawerNav.getByRole("link").first()).toBeVisible({ timeout: 15_000 });
   }
 }
 

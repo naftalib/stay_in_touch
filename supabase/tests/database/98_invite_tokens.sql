@@ -46,8 +46,7 @@ select throws_ok(
   'another family admin cannot issue a token'
 );
 
-select test.login('mom@fixture.test');
-set local role authenticated;
+reset role;
 
 reset role;
 update public.invitations

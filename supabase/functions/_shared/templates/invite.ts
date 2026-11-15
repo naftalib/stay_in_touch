@@ -25,10 +25,11 @@ export function buildInviteEmail(input: InviteTemplateInput): {
   const family = escapeHtml(input.familyName);
   const inviter = escapeHtml(input.inviterName);
   const label = escapeHtml(input.label);
-  const url = input.inviteUrl;
-  const until = formatDate(input.expiresAt);
+  const url = escapeHtml(input.inviteUrl);
+  const until = escapeHtml(formatDate(input.expiresAt));
 
-  const subject = `${input.inviterName} invited you to ${input.familyName} on Stay In Touch`;
+  const subject = `${input.inviterName} invited you to ${input.familyName} on Stay In Touch`
+    .replace(/[\r\n]+/g, " ");
 
   const html = `<!DOCTYPE html>
 <html lang="en">
