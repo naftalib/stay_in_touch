@@ -131,6 +131,7 @@ Rebased the review onto the CI fix rounds above. Invite users are created alread
 - Run [43740864806](https://github.com/naftalib/stay_in_touch/actions/runs/43740864806) on review commit `c172b2f`: web ~20s, functions ~11s, db ~85s; e2e failed on mobile only (`child alias sets a password and can switch back`) — drawer footer “Switch account” was not actionable. Added `switchAccountFromApp` and flex shrink on the Spaces drawer body.
 - Run [43742532230](https://github.com/naftalib/stay_in_touch/actions/runs/43742532230) on `307eb2d` failed the same iPhone test. The helper returned before the shell had painted, so the drawer never opened, and `spacesShell` matched every dialog. It now waits for the aside nav or the Spaces button, then scopes the shell to the aside or the Spaces drawer. The drawer and the side column keep the footer on screen while the space list scrolls.
 - Run [43744303310](https://github.com/naftalib/stay_in_touch/actions/runs/43744303310) on `f6375e0`: webkit child-alias failed after Lia password sign-in — session restored but `SignInPage` kept `?signedOut=1` and blocked redirect. Password and OTP success now `navigate` to the safe return path.
+- Run [43745321458](https://github.com/naftalib/stay_in_touch/actions/runs/43745321458) on `66523b7` (**all green**): web ~20s, functions ~11s, db ~74s, e2e ~463s / 120 tests (chromium, webkit, mobile).
 
 ## Follow-ups carried forward
 
