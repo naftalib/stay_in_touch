@@ -55,10 +55,6 @@ jobs:
             sleep 3
           done
           exit 1
-      - name: Serve Edge Functions
-        run: |
-          supabase functions serve --env-file supabase/functions/.env.example &
-          sleep 5
       - name: Reset database
         run: supabase db reset
       - name: Check generated types drift

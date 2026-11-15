@@ -65,6 +65,10 @@ Pending Grok 4.7 review.
 
 - E2E job [43733686550](https://github.com/naftalib/stay_in_touch/actions/runs/43733686550) failed before Playwright: `supabase start` could not bind Mailpit host port 54324 (`address already in use`). E2E `supabase start` now stops any prior stack and retries up to three times.
 
+## CI fix round 7 (Nov 15)
+
+- Dropped `supabase functions serve` from the e2e job so Kong routes to the stack edge runtime (with `MAILPIT_URL=http://inbucket:8025`), not a second worker using loopback Mailpit from `.env.example`. Local `invite-send` returns the underlying error message for easier CI diagnosis.
+
 ## Follow-ups carried forward
 
 - Expand Playwright to full spec §10 list and axe matrix on new screens.

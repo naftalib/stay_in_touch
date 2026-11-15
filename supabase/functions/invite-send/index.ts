@@ -109,7 +109,12 @@ export default {
         return Response.json({ error: message }, { status: 429 });
       }
       console.error("invite-send error", message);
-      return Response.json({ error: "Could not send invitation." }, { status: 500 });
+      const url = Deno.env.get("SUPABASE_URL") ?? "";
+      const localDev = url.includes("127.0.0.1") || url.includes("localhost") || url.includes("kong");
+      return Response.json(
+        { error: localDev ? message : "Could not send invitation." },
+        { status: 500 },
+      );
     }
   }),
 };
