@@ -9,6 +9,7 @@ export type UploadDeps = {
     ) => PromiseLike<{ data: unknown; error: RpcError }>;
   };
   store: MediaStore;
+  provider: string;
 };
 
 type ReserveRow = { media_id: string; key: string; thumb_key: string };
@@ -37,6 +38,7 @@ export async function handleMediaUploadUrl(request: Request, deps: UploadDeps): 
     p_width: input.width,
     p_height: input.height,
     p_caption: caption,
+    p_provider: deps.provider,
   });
   if (reserved.error) return rpcFailure(reserved.error);
 

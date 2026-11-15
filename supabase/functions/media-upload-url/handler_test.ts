@@ -22,6 +22,10 @@ function store(): MediaStore {
   };
 }
 
+const deps = {
+  provider: "supabase" as const,
+};
+
 function request(body: unknown, auth = "Bearer user"): Request {
   return new Request("http://localhost/media-upload-url", {
     method: "POST",
@@ -31,6 +35,7 @@ function request(body: unknown, auth = "Bearer user"): Request {
 }
 
 Deno.test("media-upload-url returns signed targets and not storage keys", async () => {
+  let reserved: Record<string, unknown> | undefined;
   const response = await handleMediaUploadUrl(
     request({
       space_id: SPACE,
@@ -42,17 +47,20 @@ Deno.test("media-upload-url returns signed targets and not storage keys", async 
     }),
     {
       supabase: {
-        rpc: () =>
-          Promise.resolve({
+        rpc: (_fn, args) => {
+          reserved = args;
+          return Promise.resolve({
             data: [{
               media_id: MEDIA,
               key: "f/fam/s/space/id/original.jpg",
               thumb_key: "f/fam/s/space/id/thumb.jpg",
             }],
             error: null,
-          }),
+          });
+        },
       },
       store: store(),
+      provider: deps.provider,
     },
   );
   const text = await response.text();
@@ -63,6 +71,7 @@ Deno.test("media-upload-url returns signed targets and not storage keys", async 
   assertEquals(json.media_id, MEDIA);
   assertEquals(json.upload.method, "PUT");
   assertStringIncludes(json.upload.url, "127.0.0.1:54321");
+  assertEquals(reserved?.p_provider, "supabase");
 });
 
 Deno.test("media-upload-url maps a posting refusal to a generic 403", async () => {
@@ -83,6 +92,7 @@ Deno.test("media-upload-url maps a posting refusal to a generic 403", async () =
           }),
       },
       store: store(),
+      provider: "supabase",
     },
   );
   assertEquals(response.status, 403);

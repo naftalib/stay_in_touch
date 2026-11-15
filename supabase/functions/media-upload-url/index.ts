@@ -17,11 +17,20 @@ function withCors(response: Response, request: Request): Response {
 }
 
 const authed = withSupabase({ auth: "user", cors: "disabled" }, async (request, ctx) => {
+  const provider = Deno.env.get("MEDIA_PROVIDER")?.trim();
+  if (!provider) {
+    console.error("MEDIA_PROVIDER is missing");
+    return new Response(JSON.stringify({ error: "Something went wrong." }), {
+      status: 500,
+      headers: { "content-type": "application/json" },
+    });
+  }
   return await handleMediaUploadUrl(request, {
     supabase: {
       rpc: (fn, args) => ctx.supabase.rpc(fn, args),
     },
     store: getMediaStore(),
+    provider,
   });
 });
 
