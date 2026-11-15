@@ -86,7 +86,9 @@ Attacked as Noa, Ari, Grandma, and the anon key: storage list, download, upload,
 
 A live Grandma upload through `media-upload-url`, raw PUT, and `media-finish` stored a JPEG. The signed view host was `127.0.0.1:54321` (not `kong:8000`), the token TTL was 3600 seconds, and the GET sent `Expires` one hour after `Date` with no `Cache-Control`.
 
-Opening the pull request failed again with "must be a collaborator", so CI has not run. CI starts on `pull_request` only. Job durations are not recorded until that run exists.
+Pull request 5 is https://github.com/naftalib/stay_in_touch/pull/5. CI run [43770819479](https://github.com/naftalib/stay_in_touch/actions/runs/43770819479) on `bd120d6` is green. Job durations: web 22s, functions 12s, db 1m 16s, e2e 8m 22s.
+
+Two earlier runs failed. WebKit missed `tie-alpha` because the older-message loop ran before the thread was painted, and a Playwright click on that button then waited out the test timeout because the list stays scrolled to the bottom. The test now waits for the first page and dispatches the click. The database job once could not bind port 54322 after `supabase start` stopped its first container; it now clears the ports and retries, as the e2e job already did.
 
 ## Follow-ups carried forward
 
