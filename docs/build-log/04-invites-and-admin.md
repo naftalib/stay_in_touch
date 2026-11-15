@@ -73,6 +73,10 @@ Pending Grok 4.7 review.
 
 - E2e setup flakiness: GitHub runners sometimes leave Supabase ports busy (54322/54324). Prep step removes `supabase_*` containers and kills bound ports before each `supabase start` attempt.
 
+## CI fix round 9 (Nov 15)
+
+- Run [43735855549](https://github.com/naftalib/stay_in_touch/actions/runs/43735855549): invite mail works; invite E2E failed because `latestEmailTo` picked the invite email (no OTP). Wait for code UI and pass `since` after requesting the sign-in code.
+
 ## Follow-ups carried forward
 
 - Expand Playwright to full spec §10 list and axe matrix on new screens.

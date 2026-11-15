@@ -51,10 +51,12 @@ test.describe("Invites and admin", () => {
     const page = await invitee.newPage();
     await page.goto(link!);
     await expect(page.getByText(/invited you to join/i)).toBeVisible();
+    const otpSentAt = new Date();
     await page.getByRole("button", { name: /sign-in code/i }).click();
-    const codeMail = await latestEmailTo(email);
+    await expect(page.getByLabel("6-digit code")).toBeVisible({ timeout: 15_000 });
+    const codeMail = await latestEmailTo(email, otpSentAt);
     expect(codeMail).toBeTruthy();
-    const code = extractOtp(`${codeMail!.Text ?? ""}\n${codeMail!.HTML ?? ""}`);
+    const code = extractOtp(`${codeMail!.HTML ?? ""} ${codeMail!.Text ?? ""}`);
     expect(code).toBeTruthy();
     await page.getByLabel("6-digit code").fill(code!);
     await page.getByRole("button", { name: "Continue" }).click();
