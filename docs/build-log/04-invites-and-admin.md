@@ -126,6 +126,10 @@ Reviewed on 15 Nov 2026 against the handoff spec and the review checklist. Fixes
 
 Rebased the review onto the CI fix rounds above. Invite users are created already confirmed (ADR 0060). Revoke keeps the token hash and sets `status = 'revoked'`. A loopback `MAILPIT_URL` is ignored when the function is running on the Docker network, so host `.env.example` does not point the edge runtime at itself. Playwright after this rebase: 120 passed in 6.5 minutes. The invite file still resets the database when it finishes so later specs see the seed. `z-removed-member.spec.ts` remains as a last-file REST check.
 
+## CI fix round 11 (Nov 15)
+
+- Run [43740864806](https://github.com/naftalib/stay_in_touch/actions/runs/43740864806) on review commit `c172b2f`: web ~20s, functions ~11s, db ~85s; e2e failed on mobile only (`child alias sets a password and can switch back`) — drawer footer “Switch account” sat below the fold without `scrollIntoViewIfNeeded`. Added `switchAccountFromApp` e2e helper and flex shrink on the Spaces drawer body so the footer stays reachable on narrow viewports.
+
 ## Follow-ups carried forward
 
 - Hosted Resend domain go-live (switch `EMAIL_TRANSPORT` only). No Resend key is in the repo or CI.

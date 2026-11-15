@@ -93,6 +93,14 @@ export async function signOutFromApp(page: import("@playwright/test").Page) {
   await expect(page).toHaveURL(/sign-in/, { timeout: 15_000 });
 }
 
+export async function switchAccountFromApp(page: import("@playwright/test").Page) {
+  await ensureSpacesNavOpen(page);
+  const switchAccount = spacesShell(page).getByRole("button", { name: "Switch account" });
+  await switchAccount.scrollIntoViewIfNeeded();
+  await switchAccount.click({ timeout: 15_000 });
+  await expect(page).toHaveURL(/sign-in/, { timeout: 15_000 });
+}
+
 export const test = base.extend<{ seedUser: SeedUser }>({
   seedUser: [SEED_USERS.grandma, { option: true }],
 });

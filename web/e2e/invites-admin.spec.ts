@@ -6,9 +6,9 @@ import {
   expect,
   signInWithPassword,
   signOutFromApp,
+  switchAccountFromApp,
   ensureSpacesNavOpen,
   spacesNav,
-  spacesShell,
   SEED_USERS,
   FAMILY_ID,
   resetDatabase,
@@ -167,9 +167,7 @@ test.describe("Invites and admin", () => {
     await panel.getByRole("textbox", { name: "Password" }).fill("lia-pass-1");
     await panel.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(new RegExp(`/f/${FAMILY_ID}/s/`), { timeout: 20_000 });
-    await ensureSpacesNavOpen(page);
-    await spacesShell(page).getByRole("button", { name: "Switch account" }).click();
-    await expect(page).toHaveURL(/sign-in/);
+    await switchAccountFromApp(page);
     await expect(page.getByRole("button", { name: "Mom", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Mom", exact: true }).click();
     await page.getByRole("tab", { name: "Sign in with password" }).click();
