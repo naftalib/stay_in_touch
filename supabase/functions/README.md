@@ -17,6 +17,11 @@ Shared code lives in `_shared/` (not deployed as its own function).
 
 Required secrets: `EMAIL_TRANSPORT=mailpit`, `APP_URL=http://127.0.0.1:5173`, `EMAIL_FROM`.
 
+When functions are invoked through local Kong (for example Playwright E2E), they run inside the
+Supabase Docker network. Export `MAILPIT_URL=http://inbucket:8025` before `supabase start`, or rely on
+the default in `_shared/email.ts`. `supabase functions serve` on the host uses `MAILPIT_URL=
+http://127.0.0.1:54324` from `.env.example`.
+
 ## Tests
 
 From `supabase/functions`:

@@ -39,6 +39,12 @@ jobs:
         with:
           version: 3.1.0
       - name: Start Supabase (auth, API, Realtime, Mailpit, Edge Runtime)
+        env:
+          # Edge runtime runs on the Supabase Docker network; Mailpit is reachable as inbucket:8025.
+          MAILPIT_URL: http://inbucket:8025
+          EMAIL_TRANSPORT: mailpit
+          APP_URL: http://127.0.0.1:5173
+          EMAIL_FROM: Stay In Touch <no-reply@example.test>
         run: supabase start -x studio,storage-api,imgproxy,logflare,vector,supavisor
       - name: Serve Edge Functions
         run: |

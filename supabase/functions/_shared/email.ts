@@ -14,14 +14,26 @@ function requireEnv(name: string): string {
   return value;
 }
 
+function supabaseUrl(): string {
+  return Deno.env.get("SUPABASE_URL") ?? "";
+}
+
 function isLocalSupabaseUrl(): boolean {
-  const url = Deno.env.get("SUPABASE_URL") ?? "";
-  return url.includes("127.0.0.1") || url.includes("localhost");
+  const url = supabaseUrl();
+  if (!url) return true;
+  if (url.includes("127.0.0.1") || url.includes("localhost")) return true;
+  // Edge runtime inside the local Supabase Docker network talks to Kong, not loopback.
+  if (url.includes("kong") || url.includes("supabase_kong")) return true;
+  return false;
 }
 
 function mailpitBaseUrl(): string {
   const configured = Deno.env.get("MAILPIT_URL");
   if (configured) return configured.replace(/\/$/, "");
+  const url = supabaseUrl();
+  if (url.includes("kong") || url.includes("supabase_kong") || !url) {
+    return "http://inbucket:8025";
+  }
   return "http://127.0.0.1:54324";
 }
 
