@@ -13,7 +13,9 @@ Handoff 05: private photo storage, a provider setting, browser JPEG preparation,
 
 ## PR
 
-Opened against `main` at the end of this handoff. Title: Handoff 05: photos.
+GitHub refused pull-request creation with "must be a collaborator". The branch is pushed. Compare: https://github.com/naftalib/stay_in_touch/compare/main...cursor/photos-6f14
+
+CI in this repo runs on `pull_request` and on pushes to `main`, so this branch has no Actions run. Local results are below.
 
 ## What was built
 
