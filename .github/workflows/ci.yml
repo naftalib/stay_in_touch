@@ -49,12 +49,14 @@ jobs:
           free_ports() {
             supabase stop --no-backup || true
             docker ps -aq --filter name=supabase_ | xargs -r docker rm -f
+            docker network prune -f || true
             for p in 54321 54322 54323 54324 54325 54326 54327; do
+              sudo lsof -ti:"$p" | xargs -r sudo kill -9
               sudo fuser -k "${p}/tcp" 2>/dev/null || true
             done
-            sleep 2
+            sleep 5
           }
-          for attempt in 1 2 3; do
+          for attempt in 1 2 3 4 5; do
             free_ports
             if supabase start -x studio,storage-api,imgproxy,logflare,vector,supavisor; then
               exit 0
