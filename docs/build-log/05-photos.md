@@ -84,6 +84,10 @@ CI=true pnpm --filter web test:e2e
 
 Attacked as Noa, Ari, Grandma, and the anon key: storage list, download, upload, remove, and createSignedUrl failed (an existing object still returned `NoSuchKey` to Noa). Ari cannot read Mom's space or Grandma's pending row, cannot reserve in Noa's space, and `media-view-urls` returned `{}` for that pending id. `mark_media_ready` is denied to Noa. `media-upload-url` without a user JWT and `media-cleanup` without its secret both returned 401. The function omits `Access-Control-Allow-Origin` for a foreign origin; local Kong still adds `*`. That is recorded in `docs/hosted-settings.md`.
 
+A live Grandma upload through `media-upload-url`, raw PUT, and `media-finish` stored a JPEG. The signed view host was `127.0.0.1:54321` (not `kong:8000`), the token TTL was 3600 seconds, and the GET sent `Expires` one hour after `Date` with no `Cache-Control`.
+
+Opening the pull request failed again with "must be a collaborator", so CI has not run. CI starts on `pull_request` only. Job durations are not recorded until that run exists.
+
 ## Follow-ups carried forward
 
 From build log 04:
