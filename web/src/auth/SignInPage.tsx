@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useLocation } from "react-router";
+import { Navigate, useLocation, useNavigate } from "react-router";
 import {
   Button,
   FieldError,
@@ -27,6 +27,7 @@ type LocationState = {
 export default function SignInPage() {
   const { session } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const state = (location.state as LocationState | null) ?? {};
   const requested =
     state.from?.pathname ?? new URLSearchParams(location.search).get("next") ?? undefined;
@@ -70,6 +71,7 @@ export default function SignInPage() {
         return;
       }
       rememberRecentAccount({ email: trimmed, displayName: trimmed });
+      navigate(from, { replace: true });
     } catch (caught) {
       setError(mapError(caught));
     } finally {
@@ -128,6 +130,7 @@ export default function SignInPage() {
         setError(mapError(authError));
         return;
       }
+      navigate(from, { replace: true });
     } catch (caught) {
       setError(mapError(caught));
     } finally {
