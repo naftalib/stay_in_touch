@@ -51,7 +51,7 @@ as $$
 $$;
 
 create or replace function private.finish_accept_invitation(
-  invite public.invitations%rowtype,
+  p_invitation_id uuid,
   actor uuid
 )
 returns uuid
@@ -60,9 +60,19 @@ security definer
 set search_path = ''
 as $$
 declare
+  invite public.invitations%rowtype;
   member_id uuid;
   reopened_space_id uuid;
 begin
+  select * into invite
+  from public.invitations
+  where id = p_invitation_id
+  for update;
+  if not found then
+    raise exception 'invitation not found'
+      using errcode = '42501';
+  end if;
+
   if invite.create_space and invite.role = 'grandparent' then
     raise exception 'grandparents do not get a space'
       using errcode = '22023';
@@ -217,7 +227,7 @@ begin
       using errcode = '42501';
   end if;
 
-  member_id := private.finish_accept_invitation(invite, actor);
+  member_id := private.finish_accept_invitation(invite.id, actor);
   return member_id;
 end;
 $$;
@@ -433,7 +443,7 @@ begin
       using errcode = '42501';
   end if;
 
-  new_member_id := private.finish_accept_invitation(invite, actor);
+  new_member_id := private.finish_accept_invitation(invite.id, actor);
 
   return query
   select invite.family_id, new_member_id;

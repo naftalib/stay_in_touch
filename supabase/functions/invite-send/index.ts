@@ -51,16 +51,14 @@ export default {
 
       if (error) {
         console.error("issue_invitation_token failed", invitationId, error.message);
-        const status =
-          error.code === "42501" || error.message.toLowerCase().includes("admin")
-            ? 403
-            : error.code === "22023"
-              ? 429
-              : 400;
-        const message =
-          error.code === "42501"
-            ? "You do not have permission to send this invitation."
-            : error.message;
+        const status = error.code === "42501" || error.message.toLowerCase().includes("admin")
+          ? 403
+          : error.code === "22023"
+          ? 429
+          : 400;
+        const message = error.code === "42501"
+          ? "You do not have permission to send this invitation."
+          : error.message;
         return Response.json({ error: message }, { status });
       }
 
@@ -81,7 +79,9 @@ export default {
         const msg = createResult.error.message.toLowerCase();
         if (!msg.includes("already") && !msg.includes("registered")) {
           console.error("createUser failed", invitationId, createResult.error.message);
-          return Response.json({ error: "Could not prepare sign-in for invitee." }, { status: 500 });
+          return Response.json({ error: "Could not prepare sign-in for invitee." }, {
+            status: 500,
+          });
         }
       }
 

@@ -43,7 +43,8 @@ export function buildInviteEmail(input: InviteTemplateInput): {
 </body>
 </html>`;
 
-  const text = `${input.inviterName} invited you to join ${input.familyName} on Stay In Touch as ${input.label}.
+  const text =
+    `${input.inviterName} invited you to join ${input.familyName} on Stay In Touch as ${input.label}.
 
 Join: ${url}
 

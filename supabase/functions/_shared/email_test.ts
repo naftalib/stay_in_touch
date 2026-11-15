@@ -1,4 +1,4 @@
-import { assertRejects } from "jsr:@std/assert";
+import { assertRejects } from "@std/assert";
 import { sendEmail } from "./email.ts";
 
 Deno.test("sendEmail rejects missing transport", async () => {

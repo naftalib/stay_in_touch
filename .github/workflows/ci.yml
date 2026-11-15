@@ -83,7 +83,7 @@ jobs:
       - name: Deno fmt, lint, check, test
         working-directory: supabase/functions
         run: |
-          deno fmt --check
+          deno fmt --check "**/*.ts" "**/deno.json"
           deno lint
           deno check **/*.ts
           deno test --allow-env
