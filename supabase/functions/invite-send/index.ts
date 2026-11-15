@@ -71,7 +71,8 @@ export default {
       const admin = ctx.supabaseAdmin;
       const createResult = await admin.auth.admin.createUser({
         email: row.email,
-        email_confirm: false,
+        // Invitee signs in via magic link / OTP from Mailpit or the hosted provider.
+        email_confirm: true,
         user_metadata: { display_name: row.label },
       });
 
