@@ -46,6 +46,11 @@ Pending Grok 4.7 review.
 - Regenerated-shape `database.types.ts` (column order + RPC signatures).
 - E2E: read each `fetch` response body once in `invites-admin.spec.ts`; widened sign-in redirect timeout in fixtures.
 
+## CI fix round 3 (Nov 15)
+
+- **Mailpit:** `invite-send` used `inbucket:8025`; local stack exposes Mailpit at `127.0.0.1:54324` (`MAILPIT_URL` in `.env.example`).
+- Dropped `afterAll` `db reset` in `invites-admin.spec.ts` (global setup already resets; mid-suite reset broke PostgREST on later projects).
+
 ## Follow-ups carried forward
 
 - Expand Playwright to full spec §10 list and axe matrix on new screens.
