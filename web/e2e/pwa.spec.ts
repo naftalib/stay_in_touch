@@ -226,8 +226,17 @@ test("push names the space, skips the author, and opens the thread", async ({ pa
   const captured = psql(
     `select coalesce(sent_payload::text, '') from public.notification_outbox where ref_id = '${messageId}' and recipient_member_id = '${MEMBERS.noa}'`,
   );
-  expect(captured).toContain("Grandma posted in Noa");
-  expect(captured).toContain(`/f/${FAMILY_ID}/s/${NOA_SPACE}/messages`);
+  const payload = JSON.parse(captured) as {
+    app_badge: number;
+    notification: { body: string; navigate: string; tag: string };
+  };
+  // Earlier posts in this run can still be pending, so the claim groups them.
+  expect(payload.notification.body).toMatch(/^(Grandma posted in Noa|\d+ new posts in Noa)$/);
+  expect(payload.notification.navigate).toBe(
+    `http://127.0.0.1:5173/f/${FAMILY_ID}/s/${NOA_SPACE}/messages`,
+  );
+  expect(payload.notification.tag).toBe(`space:${NOA_SPACE}`);
+  expect(payload.app_badge).toBeGreaterThan(0);
   expect(captured).not.toContain("marker-zz-not-in-push");
   expect(captured).not.toContain("kong:8000");
   expect(
@@ -280,7 +289,7 @@ test("push names the space, skips the author, and opens the thread", async ({ pa
   expect(shown).toEqual([
     expect.objectContaining({
       title: "Stay In Touch",
-      body: "Grandma posted in Noa",
+      body: payload.notification.body,
       tag: `space:${NOA_SPACE}`,
     }),
   ]);

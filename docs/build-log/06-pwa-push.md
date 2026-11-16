@@ -45,7 +45,7 @@ Greptile reviewed `dc72726` at confidence 0/5 (review 5922171121, 2026-11-16). T
 
 | # | Comment | File:line | Action | Reason or commit |
 |---|---|---|---|---|
-| 1 | Push skips every recipient because the service role has no `auth.uid()` | `supabase/migrations/20261116120000_push.sql:629` | fixed | `97091fa`. New `private.space_audience_member_ids`. pgTAP `114_push_service_role.sql` runs as `service_role` with a null uid and expects Mom eligible. The Playwright test calls `push-send` and reads Noa's captured payload. |
+| 1 | Push skips every recipient because the service role has no `auth.uid()` | `supabase/migrations/20261116120000_push.sql:629` | fixed | `97091fa`. New `private.space_audience_member_ids`. pgTAP `114_push_service_role.sql` runs as `service_role` with a null uid and expects Mom eligible. The Playwright test calls `push-send` and reads Noa's captured payload. Older pending rows in the same space group into "N new posts in Noa". |
 | 2 | Switching spaces overwrites the other draft | `web/src/messages/Composer.tsx:63` | fixed | `055d7d7`. Flush and reload on the draft key. The composer remounts per person and space. Composer test. |
 | 3 | The debounce drops the last edit on unmount | `web/src/messages/Composer.tsx:90` | fixed | `055d7d7`. Unmount and space change write `bodyRef`. Composer test. |
 | 4 | `controllerchange` reloads other tabs and can drop an upload | `web/src/pwa/UpdatePrompt.tsx:47` | fixed | `055d7d7`. Reload only after this tab pressed Update now. ADR 0079. Vitest. |
