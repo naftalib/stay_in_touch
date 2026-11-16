@@ -31,9 +31,11 @@ This machine has Google Chrome 157.0.8103.50, xvfb, and outbound internet. Docke
 
 ## Runs
 
-Links, durations, subscribe time, and delivery time are filled in after the dispatched run (the one started with `workflow_dispatch` once the temporary push trigger was removed).
+The green `workflow_dispatch` run (after the temporary push trigger is removed) is filled in below once it finishes.
 
-Bootstrap, from GitHub's rule checked on 16 Nov 2026: `workflow_dispatch` only lists a workflow file that has already run, and a new file is not on the default branch. The first commit on this branch adds `push: branches: ['cursor/push-smoke-*']` so that push registers the workflow. That block is removed before the run recorded below. A later `gh workflow run push-smoke.yml --ref cursor/push-smoke-dcd3` is the run that counts.
+Bootstrap, from GitHub's rule checked on 16 Nov 2026: `workflow_dispatch` only lists a workflow file that has already run, and a new file is not on the default branch. The first commit on this branch adds `push: branches: ['cursor/push-smoke-*']` so that push registers the workflow. That block is removed before the run that counts. A later `gh workflow run push-smoke.yml --ref cursor/push-smoke-dcd3` is that run.
+
+First bootstrap run, temporary trigger still present: https://github.com/naftalib/stay_in_touch/actions/runs/43944967060 — failed in 1m 31s at "Point the trigger at push-send". `PUSH_TRANSPORT=webpush`, `pg_net` created, Kong alias `kong` on `supabase_network_stay-in-touch`. `vault.create_secret(text,text,text)` was null: `db reset` does not create `supabase_vault`, and that function's identity includes a fourth `uuid` argument, so the three-argument lookup the pgTAP test uses does not see it. Chrome did not start. The next commit creates `supabase_vault` and looks the function up by name.
 
 ## Review findings and how each was resolved
 
@@ -50,7 +52,7 @@ Not yet. Greptile reviews when the pull request opens (`autoReview` stays `["ope
 
 - Notification permission is granted after the Turn on card is visible. Granting it in the context options makes `Notification.permission` already `granted`, and the card stays hidden (`permissionView`). The click is still the app's Turn on button, which calls `Notification.requestPermission` and `PushManager.subscribe`.
 - `enablePushFromTap` gives `PushManager.subscribe` 8 seconds (`settled` in `pushClient.ts`). A first FCM registration can take longer. The test does not change that helper. If the browser has an FCM endpoint and the database row is still missing, it reloads once so `ensurePushRegistered` stores the subscription the click already created. Whether that reload was needed is recorded with the run.
-- `pg_net` is created in the job when `net.http_post` is missing. The migration calls it only when the function exists. Creating the extension in the job is what makes the existing trigger able to run on the local stack. No migration or function code changed.
+- `pg_net` and `supabase_vault` are created in the job when they are missing. The migration calls `net.http_post` only when the function exists, and it reads Vault only when `vault.decrypted_secrets` exists. Creating the extensions in the job is what makes the existing trigger able to run on the local stack. No migration or function code changed. `vault.create_secret` is found by name in the `vault` schema. The three-argument `to_regprocedure` check the pgTAP file uses returned null on the runner, so that check is not used here. The call still passes three arguments. The job prints the function's real identity; that line is recorded with the run.
 - The workflow's preflight calls `net.http_post` once, before the test, against an empty (or already settled) outbox. That only checks that Kong answers. The smoke message is posted later, through the composer, and the trigger is what sends it.
 - A temporary `push` trigger exists only on the bootstrap commit. It is not in the final workflow file.
 

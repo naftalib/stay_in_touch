@@ -46,6 +46,7 @@ The database container has to reach Kong by the Docker network name, not by `127
 ```bash
 docker exec -i supabase_db_stay-in-touch psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
 create extension if not exists pg_net;
+create extension if not exists supabase_vault;
 do $$
 begin
   if not exists (select 1 from vault.decrypted_secrets where name = 'push_send_secret') then

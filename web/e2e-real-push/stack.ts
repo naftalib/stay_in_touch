@@ -50,6 +50,13 @@ export function ensurePushPath(): { host: string; httpPost: boolean } {
   if (!httpReady) {
     psql("create extension if not exists pg_net");
   }
+  const vaultReady =
+    psql(
+      "select exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'vault' and p.proname = 'create_secret')::text",
+    ) === "true";
+  if (!vaultReady) {
+    psql("create extension if not exists supabase_vault");
+  }
   const httpPost = psql("select (to_regproc('net.http_post') is not null)::text") === "true";
   const url = process.env.PUSH_SMOKE_PUSH_URL ?? "http://kong:8000/functions/v1/push-send";
   if (url.includes("'")) throw new Error("PUSH_SMOKE_PUSH_URL has a quote");
@@ -65,7 +72,12 @@ export function ensurePushPath(): { host: string; httpPost: boolean } {
   psql(`
     do $$
     begin
-      if to_regprocedure('vault.create_secret(text,text,text)') is null then
+      if not exists (
+        select 1
+        from pg_proc p
+        join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'vault' and p.proname = 'create_secret'
+      ) then
         raise exception 'vault.create_secret is missing';
       end if;
       if not exists (select 1 from vault.decrypted_secrets where name = 'push_send_secret') then
