@@ -40,6 +40,8 @@ export type PushAdmin = {
   deleteSubscription: (id: string) => Promise<void>;
   markUsed: (id: string) => Promise<void>;
   noteFailure: (id: string, failureCount: number) => Promise<void>;
+  delivered: (ids: string[]) => Promise<string[]>;
+  noteDelivered: (ids: string[], subscriptionId: string) => Promise<void>;
   prune: () => Promise<void>;
 };
 
@@ -103,16 +105,23 @@ export async function handlePushSend(request: Request, deps: PushSendDeps): Prom
 
   for (const group of groupsOf(facts)) {
     const ineligible = group.filter((fact) => !fact.eligible);
-    if (ineligible.length > 0) {
+    const skippedByReason = new Map<string, string[]>();
+    for (const fact of ineligible) {
+      const reason = fact.skip_reason ?? "skipped";
+      const list = skippedByReason.get(reason) ?? [];
+      list.push(fact.id);
+      skippedByReason.set(reason, list);
+    }
+    for (const [reason, skippedIds] of skippedByReason) {
       await deps.admin.record({
-        ids: ineligible.map((fact) => fact.id),
+        ids: skippedIds,
         status: "skipped",
         lastStatus: null,
-        skipReason: ineligible[0]?.skip_reason ?? "skipped",
+        skipReason: reason,
         sentPayload: null,
         retry: false,
       });
-      counts.skipped += ineligible.length;
+      counts.skipped += skippedIds.length;
     }
     const eligible = group.filter((fact) => fact.eligible);
     if (eligible.length === 0) continue;
@@ -148,10 +157,11 @@ export async function handlePushSend(request: Request, deps: PushSendDeps): Prom
       continue;
     }
     const payloadText = JSON.stringify(payload);
+    const eligibleIds = eligible.map((fact) => fact.id);
     const subs = await deps.admin.subscriptions(first.recipient_user_id);
     if (subs.length === 0) {
       await deps.admin.record({
-        ids: eligible.map((fact) => fact.id),
+        ids: eligibleIds,
         status: "skipped",
         lastStatus: null,
         skipReason: "no_device",
@@ -162,12 +172,27 @@ export async function handlePushSend(request: Request, deps: PushSendDeps): Prom
       continue;
     }
 
-    let success = false;
+    const already = new Set(await deps.admin.delivered(eligibleIds));
+    const targets = subs.filter((sub) => !already.has(sub.id));
+    if (targets.length === 0) {
+      await deps.admin.record({
+        ids: eligibleIds,
+        status: "sent",
+        lastStatus: 201,
+        skipReason: null,
+        sentPayload: payload,
+        retry: false,
+      });
+      counts.sent += eligible.length;
+      continue;
+    }
+
+    let success = already.size > 0;
     let retry = false;
     let hardFail = false;
     let gone = 0;
-    let lastStatus: number | null = null;
-    for (const sub of subs) {
+    let lastStatus: number | null = already.size > 0 ? 201 : null;
+    for (const sub of targets) {
       let status = 503;
       try {
         const result = await deps.sender.send(
@@ -184,7 +209,8 @@ export async function handlePushSend(request: Request, deps: PushSendDeps): Prom
       log(`subscription ${sub.id} status ${status}`);
       if (status === 201 || status === 202) {
         success = true;
-        lastStatus = status;
+        if (lastStatus === null) lastStatus = status;
+        await deps.admin.noteDelivered(eligibleIds, sub.id);
         await deps.admin.markUsed(sub.id);
       } else if (status === 404 || status === 410) {
         gone += 1;
@@ -195,23 +221,13 @@ export async function handlePushSend(request: Request, deps: PushSendDeps): Prom
         await deps.admin.noteFailure(sub.id, sub.failure_count + 1);
       } else {
         hardFail = true;
-        lastStatus = status;
+        if (!retry) lastStatus = status;
       }
     }
 
-    if (success) {
+    if (retry) {
       await deps.admin.record({
-        ids: eligible.map((fact) => fact.id),
-        status: "sent",
-        lastStatus,
-        skipReason: null,
-        sentPayload: payload,
-        retry: false,
-      });
-      counts.sent += eligible.length;
-    } else if (retry) {
-      await deps.admin.record({
-        ids: eligible.map((fact) => fact.id),
+        ids: eligibleIds,
         status: "pending",
         lastStatus,
         skipReason: null,
@@ -219,9 +235,19 @@ export async function handlePushSend(request: Request, deps: PushSendDeps): Prom
         retry: true,
       });
       counts.retried += eligible.length;
-    } else if (gone === subs.length) {
+    } else if (success) {
       await deps.admin.record({
-        ids: eligible.map((fact) => fact.id),
+        ids: eligibleIds,
+        status: "sent",
+        lastStatus,
+        skipReason: null,
+        sentPayload: payload,
+        retry: false,
+      });
+      counts.sent += eligible.length;
+    } else if (gone === targets.length) {
+      await deps.admin.record({
+        ids: eligibleIds,
         status: "skipped",
         lastStatus,
         skipReason: "no_device",
@@ -231,7 +257,7 @@ export async function handlePushSend(request: Request, deps: PushSendDeps): Prom
       counts.skipped += eligible.length;
     } else if (hardFail) {
       await deps.admin.record({
-        ids: eligible.map((fact) => fact.id),
+        ids: eligibleIds,
         status: "failed",
         lastStatus,
         skipReason: null,

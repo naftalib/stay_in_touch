@@ -56,6 +56,18 @@ export function createPushAdmin(client: SupabaseClient): PushAdmin {
         .eq("id", id);
       unwrap(result);
     },
+    async delivered(ids) {
+      const result = await client.rpc("delivered_push_subscriptions", { p_outbox_ids: ids });
+      const rows = unwrap(result) as string[] | null;
+      return rows ?? [];
+    },
+    async noteDelivered(ids, subscriptionId) {
+      const result = await client.rpc("record_push_delivery", {
+        p_outbox_ids: ids,
+        p_subscription_id: subscriptionId,
+      });
+      unwrap(result);
+    },
     async prune() {
       const result = await client.rpc("prune_notification_outbox");
       unwrap(result);

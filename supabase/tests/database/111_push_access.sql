@@ -208,7 +208,10 @@ select is_empty(
         'push_group_facts',
         'record_push_result',
         'prune_notification_outbox',
-        'schedule_push_send_sweep'
+        'schedule_push_send_sweep',
+        'space_audience_member_ids',
+        'record_push_delivery',
+        'delivered_push_subscriptions'
       )
       and (
         has_function_privilege('authenticated', p.oid, 'execute')

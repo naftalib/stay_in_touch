@@ -29,11 +29,12 @@ function fact(overrides: Partial<FactRow> = {}): FactRow {
 function admin(options: {
   facts?: FactRow[];
   subs?: SubscriptionRow[];
-  statuses?: number[];
+  delivered?: string[];
 }): { admin: PushAdmin; recorded: unknown[]; deleted: string[]; logs: string[] } {
   const recorded: unknown[] = [];
   const deleted: string[] = [];
   const logs: string[] = [];
+  const delivered = options.delivered ?? [];
   const facts = options.facts ?? [fact()];
   const subs = options.subs ?? [
     {
@@ -62,6 +63,11 @@ function admin(options: {
       },
       markUsed: () => Promise.resolve(),
       noteFailure: () => Promise.resolve(),
+      delivered: () => Promise.resolve([...delivered]),
+      noteDelivered: (_ids, subscriptionId) => {
+        delivered.push(subscriptionId);
+        return Promise.resolve();
+      },
       prune: () => Promise.resolve(),
     },
   };
@@ -234,6 +240,85 @@ Deno.test("two authors become one who-and-where payload", async () => {
   assertEquals(recorded.sentPayload.notification.tag, "space:space-noa");
   assertEquals(recorded.sentPayload.app_badge, 2);
   assert(!JSON.stringify(recorded.sentPayload).includes(MARKER));
+});
+
+Deno.test("one device's success still retries the device that failed", async () => {
+  const phone = "https://push.example.test/phone";
+  const tablet = "https://push.example.test/tablet";
+  const delivered: string[] = [];
+  const calls: string[] = [];
+  const harness = admin({
+    subs: [
+      { id: "phone", endpoint: phone, p256dh: P256, auth: AUTH, failure_count: 0 },
+      { id: "tablet", endpoint: tablet, p256dh: P256, auth: AUTH, failure_count: 0 },
+    ],
+    delivered,
+  });
+  const deps = {
+    secret: "local-push-dev",
+    appUrl: "https://stay.example.test",
+    admin: harness.admin,
+    log: () => {},
+  };
+  await handlePushSend(request("local-push-dev"), {
+    ...deps,
+    sender: {
+      send: (sub) => {
+        calls.push(sub.endpoint);
+        return Promise.resolve({ status: sub.endpoint === phone ? 201 : 503 });
+      },
+    },
+  });
+  const first = harness.recorded[0] as { status: string; retry: boolean };
+  assertEquals(first.status, "pending");
+  assertEquals(first.retry, true);
+  assertEquals(delivered, ["phone"]);
+  assertEquals(calls, [phone, tablet]);
+
+  calls.length = 0;
+  await handlePushSend(request("local-push-dev"), {
+    ...deps,
+    sender: {
+      send: (sub) => {
+        calls.push(sub.endpoint);
+        return Promise.resolve({ status: 201 });
+      },
+    },
+  });
+  const second = harness.recorded[1] as { status: string; retry: boolean };
+  assertEquals(calls, [tablet]);
+  assertEquals(second.status, "sent");
+  assertEquals(second.retry, false);
+});
+
+Deno.test("each skipped row keeps its own reason", async () => {
+  const harness = admin({
+    facts: [
+      fact({ id: "paused-row", eligible: false, skip_reason: "paused" }),
+      fact({
+        id: "deleted-row",
+        eligible: false,
+        skip_reason: "deleted",
+        created_at: "2026-11-16T10:05:00.000Z",
+      }),
+    ],
+  });
+  let called = false;
+  await handlePushSend(request("local-push-dev"), {
+    secret: "local-push-dev",
+    appUrl: "https://stay.example.test",
+    admin: harness.admin,
+    sender: {
+      send: () => {
+        called = true;
+        return Promise.resolve({ status: 201 });
+      },
+    },
+    log: () => {},
+  });
+  assertEquals(called, false);
+  const reasons = harness.recorded.map((row) => (row as { skipReason: string }).skipReason).sort();
+  assertEquals(reasons, ["deleted", "paused"]);
 });
 
 Deno.test("three posts use the count", async () => {

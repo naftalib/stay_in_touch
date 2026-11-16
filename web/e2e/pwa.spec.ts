@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect, signInWithPassword, signOutFromApp, SEED_USERS } from "./fixtures.ts";
-import { FAMILY_ID, psql, SPACES } from "./api.ts";
+import { FAMILY_ID, MEMBERS, psql, SPACES } from "./api.ts";
 
 const production = Boolean(process.env.CI || process.env.PWA_E2E);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -202,6 +202,40 @@ test("push names the space, skips the author, and opens the thread", async ({ pa
   const stored = psql(`select coalesce(sent_payload::text, '') || coalesce(skip_reason, '') from public.notification_outbox where ref_id = '${messageId}'`);
   expect(stored).not.toContain("marker-zz-not-in-push");
 
+  // push-send uses the service role, which has no auth.uid(). The captured
+  // row is what that path stored, not a payload built in the test. Older
+  // pending rows are claimed first, so repeat until this post is sent.
+  let pushText = "";
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const pushResponse = await fetch(`${process.env.VITE_SUPABASE_URL}/functions/v1/push-send`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-push-send-secret": process.env.PUSH_SEND_SECRET ?? "local-push-dev",
+      },
+      body: "{}",
+    });
+    pushText = await pushResponse.text();
+    expect(pushResponse.status, pushText).toBe(200);
+    const status = psql(
+      `select status from public.notification_outbox where ref_id = '${messageId}' and recipient_member_id = '${MEMBERS.noa}'`,
+    );
+    if (status === "sent") break;
+  }
+  expect(pushText).not.toContain("marker-zz-not-in-push");
+  const captured = psql(
+    `select coalesce(sent_payload::text, '') from public.notification_outbox where ref_id = '${messageId}' and recipient_member_id = '${MEMBERS.noa}'`,
+  );
+  expect(captured).toContain("Grandma posted in Noa");
+  expect(captured).toContain(`/f/${FAMILY_ID}/s/${NOA_SPACE}/messages`);
+  expect(captured).not.toContain("marker-zz-not-in-push");
+  expect(captured).not.toContain("kong:8000");
+  expect(
+    psql(
+      `select status from public.notification_outbox where ref_id = '${messageId}' and recipient_member_id = '${MEMBERS.noa}'`,
+    ),
+  ).toBe("sent");
+
   psql(`delete from public.notification_outbox where recipient_member_id = '${MOM}' and ref_id = '${messageId}'`);
   await signOutFromApp(page);
   await signInWithPassword(page, SEED_USERS.mom);
@@ -236,16 +270,20 @@ test("push names the space, skips the author, and opens the thread", async ({ pa
   await session.send("ServiceWorker.deliverPushMessage", {
     origin: "http://127.0.0.1:5173",
     registrationId,
-    data: JSON.stringify({
-      web_push: 8030,
-      notification: {
-        title: "Stay In Touch",
-        body: "Grandma posted in Noa",
-        navigate: target,
-        tag: `space:${NOA_SPACE}`,
-      },
-    }),
+    data: captured,
   });
+  const shown = await page.evaluate(async () => {
+    const registration = await navigator.serviceWorker.ready;
+    const items = await registration.getNotifications();
+    return items.map((item) => ({ title: item.title, body: item.body, tag: item.tag }));
+  });
+  expect(shown).toEqual([
+    expect.objectContaining({
+      title: "Stay In Touch",
+      body: "Grandma posted in Noa",
+      tag: `space:${NOA_SPACE}`,
+    }),
+  ]);
   await page.evaluate((url: string) => {
     return navigator.serviceWorker.ready.then((registration) => {
       registration.active?.postMessage({ type: "NOTIFICATION_CLICK", url });

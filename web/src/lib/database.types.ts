@@ -615,6 +615,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      push_deliveries: {
+        Row: {
+          created_at: string;
+          outbox_id: string;
+          subscription_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          outbox_id: string;
+          subscription_id: string;
+        };
+        Update: {
+          created_at?: string;
+          outbox_id?: string;
+          subscription_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "push_deliveries_outbox_id_fkey";
+            columns: ["outbox_id"];
+            isOneToOne: false;
+            referencedRelation: "notification_outbox";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       push_subscriptions: {
         Row: {
           auth: string;
@@ -816,6 +843,7 @@ export type Database = {
         Returns: string;
       };
       delete_photo_orphan_rows: { Args: { p_ids: string[] }; Returns: number };
+      delivered_push_subscriptions: { Args: { p_outbox_ids: string[] }; Returns: string[] };
       invitation_preview: {
         Args: { p_token: string };
         Returns: {
@@ -902,6 +930,10 @@ export type Database = {
           space_id: string;
           space_title: string;
         }[];
+      };
+      record_push_delivery: {
+        Args: { p_outbox_ids: string[]; p_subscription_id: string };
+        Returns: undefined;
       };
       record_push_result: {
         Args: {
