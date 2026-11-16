@@ -1,5 +1,15 @@
 const PREFIX = "sit-draft:";
 
+let writesSuspended = false;
+
+export function suspendDraftWrites(): void {
+  writesSuspended = true;
+}
+
+export function resumeDraftWrites(): void {
+  writesSuspended = false;
+}
+
 export function draftStorageKey(userId: string, spaceId: string): string {
   return `${PREFIX}${userId}:${spaceId}`;
 }
@@ -13,6 +23,7 @@ export function readDraft(key: string): string {
 }
 
 export function writeDraft(key: string, text: string): void {
+  if (writesSuspended) return;
   try {
     if (text.length === 0) localStorage.removeItem(key);
     else localStorage.setItem(key, text);

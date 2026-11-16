@@ -1,7 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 import { useRegisterSW } from "virtual:pwa-register/react";
-import { shouldOfferUpdate, useComposeActive } from "./composeActivity.ts";
+import {
+  shouldOfferUpdate,
+  shouldReloadOnControllerChange,
+  useComposeActive,
+} from "./composeActivity.ts";
 import { flushDrafts } from "./drafts.ts";
 import { UPDATE_LATER_KEY } from "./pushClient.ts";
 import styles from "./PwaChrome.module.css";
@@ -10,9 +14,11 @@ let watchingUpdates = false;
 
 export default function UpdatePrompt() {
   const composing = useComposeActive();
+  const reloadRequested = useRef(false);
   const [dismissed, setDismissed] = useState(
     () => sessionStorage.getItem(UPDATE_LATER_KEY) === "1",
   );
+  const [newerVersion, setNewerVersion] = useState(false);
   const {
     needRefresh: [needRefresh],
     updateServiceWorker,
@@ -38,15 +44,26 @@ export default function UpdatePrompt() {
   });
 
   useEffect(() => {
-    if (!needRefresh) return;
     const onChange = () => {
+      if (!shouldReloadOnControllerChange(reloadRequested.current)) return;
       window.location.reload();
     };
     navigator.serviceWorker?.addEventListener("controllerchange", onChange);
     return () => navigator.serviceWorker?.removeEventListener("controllerchange", onChange);
-  }, [needRefresh]);
+  }, []);
 
-  if (!shouldOfferUpdate({ needRefresh, composing, dismissed })) return null;
+  useEffect(() => {
+    if (!dismissed) return;
+    let registration: ServiceWorkerRegistration | undefined;
+    const onFound = () => setNewerVersion(true);
+    void navigator.serviceWorker?.getRegistration().then((found) => {
+      registration = found;
+      registration?.addEventListener("updatefound", onFound);
+    });
+    return () => registration?.removeEventListener("updatefound", onFound);
+  }, [dismissed]);
+
+  if (!shouldOfferUpdate({ needRefresh, composing, dismissed, newerVersion })) return null;
 
   return (
     <div className={styles.sheet} role="status">
@@ -54,6 +71,7 @@ export default function UpdatePrompt() {
       <div className={styles.actions}>
         <Button
           onPress={() => {
+            reloadRequested.current = true;
             flushDrafts();
             void updateServiceWorker(false);
           }}
@@ -63,6 +81,7 @@ export default function UpdatePrompt() {
         <Button
           onPress={() => {
             sessionStorage.setItem(UPDATE_LATER_KEY, "1");
+            setNewerVersion(false);
             setDismissed(true);
           }}
         >

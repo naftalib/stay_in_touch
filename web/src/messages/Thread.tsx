@@ -236,6 +236,7 @@ export default function Thread({ familyId, spaceId, spaceTitle, archived }: Thre
       )}
 
       <Composer
+        key={`${userId ?? "signed-out"}:${spaceId}`}
         disabled={archived}
         disabledReason={
           archived ? "This space is archived. You can read it but not post." : undefined

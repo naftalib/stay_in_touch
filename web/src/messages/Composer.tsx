@@ -8,15 +8,15 @@ import {
   TextArea,
   TextField,
 } from "react-aria-components";
-import { mapError, type AppError } from "../lib/errors.ts";
+import { type AppError, mapError } from "../lib/errors.ts";
 import { getSupabase } from "../lib/supabase.ts";
 import ConfirmDialog from "../ui/ConfirmDialog.tsx";
 import { preparePhoto } from "../media/preparePhoto.ts";
 import {
   MAX_PHOTOS_PER_POST,
+  type PhotoDraft,
   sendGate,
   tooManyPhotos,
-  type PhotoDraft,
 } from "../media/photoDraft.ts";
 import { setComposeActive } from "../pwa/composeActivity.ts";
 import {
@@ -24,6 +24,7 @@ import {
   draftStorageKey,
   readDraft,
   registerDraftFlush,
+  resumeDraftWrites,
   writeDraft,
 } from "../pwa/drafts.ts";
 import { PHOTOS_IN_PROGRESS_KEY } from "../pwa/pushClient.ts";
@@ -61,6 +62,8 @@ export default function Composer({
 }: ComposerProps) {
   const draftKey = userId && spaceId ? draftStorageKey(userId, spaceId) : null;
   const [body, setBody] = useState(() => (draftKey ? readDraft(draftKey) : ""));
+  const bodyRef = useRef(body);
+  const activeKey = useRef(draftKey);
   const [photos, setPhotos] = useState<PhotoDraft[]>([]);
   const [photoNotice] = useState(() => {
     try {
@@ -84,14 +87,39 @@ export default function Composer({
   }, [replyTo]);
 
   useEffect(() => {
-    if (!draftKey) return;
-    const timer = window.setTimeout(() => writeDraft(draftKey, body), 400);
-    return () => window.clearTimeout(timer);
-  }, [body, draftKey]);
+    bodyRef.current = body;
+  }, [body]);
+
+  useEffect(() => {
+    if (userId) resumeDraftWrites();
+  }, [userId]);
 
   useEffect(() => {
     if (!draftKey) return;
-    return registerDraftFlush(() => writeDraft(draftKey, body));
+    const key = draftKey;
+    const unregister = registerDraftFlush(() => writeDraft(key, bodyRef.current));
+    return () => {
+      writeDraft(key, bodyRef.current);
+      unregister();
+    };
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (activeKey.current === draftKey) return;
+    const next = draftKey ? readDraft(draftKey) : "";
+    activeKey.current = draftKey;
+    bodyRef.current = next;
+    setBody(next);
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (!draftKey) return;
+    const key = draftKey;
+    const timer = window.setTimeout(() => {
+      if (activeKey.current !== key) return;
+      writeDraft(key, bodyRef.current);
+    }, 400);
+    return () => window.clearTimeout(timer);
   }, [body, draftKey]);
 
   useEffect(() => {
@@ -143,7 +171,7 @@ export default function Composer({
 
   function patch(localId: string, next: Partial<PhotoDraft>) {
     setPhotos((current) =>
-      current.map((photo) => (photo.localId === localId ? { ...photo, ...next } : photo)),
+      current.map((photo) => (photo.localId === localId ? { ...photo, ...next } : photo))
     );
   }
 
@@ -262,6 +290,7 @@ export default function Composer({
       } else {
         await onSend(trimmed, replyTo?.id ?? null);
       }
+      bodyRef.current = "";
       if (draftKey) clearDraft(draftKey);
       setBody("");
       onCancelReply?.();
@@ -285,76 +314,82 @@ export default function Composer({
   return (
     <footer className={styles.footer}>
       {replyTo ? <FormReplyBar replyTo={replyTo} onCancel={onCancelReply} /> : null}
-      {spaceId ? (
-        <div className={styles.toolbar}>
-          <FileTrigger
-            acceptedFileTypes={["image/*", "image/heic", "image/heif", ".heic", ".heif"]}
-            allowsMultiple
-            onSelect={(list) => {
-              if (list) void addFiles([...list]);
-            }}
-          >
-            <Button type="button" className={styles.addPhotos}>
-              Add photos
-            </Button>
-          </FileTrigger>
-        </div>
-      ) : null}
-      {photos.length > 0 ? (
-        <ul className={styles.previews}>
-          {photos.map((photo, index) => (
-            <li key={photo.localId} className={styles.preview}>
-              {photo.previewUrl ? (
-                <img src={photo.previewUrl} alt={photo.caption.trim() || "Photo preview"} />
-              ) : (
-                <span>Preparing…</span>
-              )}
-              {photo.phase === "preparing" || photo.phase === "uploading" ? (
-                <div
-                  role="progressbar"
-                  aria-label="Uploading photo"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={Math.round(photo.progress * 100)}
-                >
-                  {photo.phase === "preparing" ? "Preparing" : "Uploading"}
-                </div>
-              ) : null}
-              {photo.phase === "failed" ? (
-                <p role="alert">
-                  {photo.error ?? "Upload failed."}{" "}
-                  <Button
-                    type="button"
-                    className={styles.retry}
-                    onPress={() => {
-                      const file = filesRef.current.get(photo.localId);
-                      if (file) void uploadOne(photo.localId, file);
-                    }}
-                  >
-                    Retry
-                  </Button>
-                </p>
-              ) : null}
-              <Button
-                type="button"
-                className={styles.retry}
-                aria-label={`Remove photo ${index + 1} of ${photos.length}`}
-                onPress={() => removePhoto(photo.localId)}
-              >
-                Remove
+      {spaceId
+        ? (
+          <div className={styles.toolbar}>
+            <FileTrigger
+              acceptedFileTypes={["image/*", "image/heic", "image/heif", ".heic", ".heif"]}
+              allowsMultiple
+              onSelect={(list) => {
+                if (list) void addFiles([...list]);
+              }}
+            >
+              <Button type="button" className={styles.addPhotos}>
+                Add photos
               </Button>
-              <label>
-                Describe this photo (optional)
-                <input
-                  value={photo.caption}
-                  maxLength={200}
-                  onChange={(event) => patch(photo.localId, { caption: event.target.value })}
-                />
-              </label>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+            </FileTrigger>
+          </div>
+        )
+        : null}
+      {photos.length > 0
+        ? (
+          <ul className={styles.previews}>
+            {photos.map((photo, index) => (
+              <li key={photo.localId} className={styles.preview}>
+                {photo.previewUrl
+                  ? <img src={photo.previewUrl} alt={photo.caption.trim() || "Photo preview"} />
+                  : <span>Preparing…</span>}
+                {photo.phase === "preparing" || photo.phase === "uploading"
+                  ? (
+                    <div
+                      role="progressbar"
+                      aria-label="Uploading photo"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={Math.round(photo.progress * 100)}
+                    >
+                      {photo.phase === "preparing" ? "Preparing" : "Uploading"}
+                    </div>
+                  )
+                  : null}
+                {photo.phase === "failed"
+                  ? (
+                    <p role="alert">
+                      {photo.error ?? "Upload failed."}{" "}
+                      <Button
+                        type="button"
+                        className={styles.retry}
+                        onPress={() => {
+                          const file = filesRef.current.get(photo.localId);
+                          if (file) void uploadOne(photo.localId, file);
+                        }}
+                      >
+                        Retry
+                      </Button>
+                    </p>
+                  )
+                  : null}
+                <Button
+                  type="button"
+                  className={styles.retry}
+                  aria-label={`Remove photo ${index + 1} of ${photos.length}`}
+                  onPress={() => removePhoto(photo.localId)}
+                >
+                  Remove
+                </Button>
+                <label>
+                  Describe this photo (optional)
+                  <input
+                    value={photo.caption}
+                    maxLength={200}
+                    onChange={(event) => patch(photo.localId, { caption: event.target.value })}
+                  />
+                </label>
+              </li>
+            ))}
+          </ul>
+        )
+        : null}
       <Form className={styles.form} onSubmit={handleSubmit}>
         <TextField
           name="message"
@@ -380,55 +415,62 @@ export default function Composer({
           />
           <FieldError className={styles.fieldError} />
         </TextField>
-        {body.length > MAX_LENGTH - 200 ? (
-          <p className={styles.counter} aria-live="polite">
-            {MAX_LENGTH - body.length} characters left
-          </p>
-        ) : null}
-        {photoNotice ? (
-          <p role="status">Photos from your last visit were not saved. Add them again.</p>
-        ) : null}
-        {offline ? (
-          <p className={styles.counter} id="offline-send-reason" role="status">
-            {OFFLINE_SEND}
-          </p>
-        ) : null}
-        {gate.reason ? (
-          <p className={styles.counter} id="photo-send-reason" role="status">
-            {gate.reason}
-          </p>
-        ) : null}
+        {body.length > MAX_LENGTH - 200
+          ? (
+            <p className={styles.counter} aria-live="polite">
+              {MAX_LENGTH - body.length} characters left
+            </p>
+          )
+          : null}
+        {photoNotice
+          ? <p role="status">Photos from your last visit were not saved. Add them again.</p>
+          : null}
+        {offline
+          ? (
+            <p className={styles.counter} id="offline-send-reason" role="status">
+              {OFFLINE_SEND}
+            </p>
+          )
+          : null}
+        {gate.reason
+          ? (
+            <p className={styles.counter} id="photo-send-reason" role="status">
+              {gate.reason}
+            </p>
+          )
+          : null}
         <Button
           type="submit"
           className={styles.button}
           isDisabled={submitting || !gate.enabled || Boolean(offline)}
-          aria-describedby={
-            [offline ? "offline-send-reason" : null, gate.reason ? "photo-send-reason" : null]
-              .filter(Boolean)
-              .join(" ") || undefined
-          }
+          aria-describedby={[
+            offline ? "offline-send-reason" : null,
+            gate.reason ? "photo-send-reason" : null,
+          ]
+            .filter(Boolean)
+            .join(" ") || undefined}
         >
           Send
         </Button>
       </Form>
-      {photos.length >= MAX_PHOTOS_PER_POST ? (
-        <p role="status">You can add up to 10 photos on one message.</p>
-      ) : null}
-      {error ? (
-        <p className={styles.error} role="alert">
-          {error.title}
-        </p>
-      ) : null}
+      {photos.length >= MAX_PHOTOS_PER_POST
+        ? <p role="status">You can add up to 10 photos on one message.</p>
+        : null}
+      {error
+        ? (
+          <p className={styles.error} role="alert">
+            {error.title}
+          </p>
+        )
+        : null}
       <ConfirmDialog
-        request={
-          leaveTo
-            ? {
-                title: "Photos are still uploading",
-                body: "Leave this page? The upload in progress will stop.",
-                confirmLabel: "Leave",
-              }
-            : null
-        }
+        request={leaveTo
+          ? {
+            title: "Photos are still uploading",
+            body: "Leave this page? The upload in progress will stop.",
+            confirmLabel: "Leave",
+          }
+          : null}
         onClose={(confirmed) => {
           const href = leaveTo;
           setLeaveTo(null);
@@ -445,11 +487,13 @@ function FormReplyBar({ replyTo, onCancel }: { replyTo: ThreadMessage; onCancel?
       <span>
         Replying to {replyTo.authorLabel}: {(replyTo.body.split("\n")[0] ?? "").slice(0, 60)}
       </span>
-      {onCancel ? (
-        <Button type="button" className={styles.cancelReply} onPress={onCancel}>
-          Cancel
-        </Button>
-      ) : null}
+      {onCancel
+        ? (
+          <Button type="button" className={styles.cancelReply} onPress={onCancel}>
+            Cancel
+          </Button>
+        )
+        : null}
     </div>
   );
 }

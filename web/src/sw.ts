@@ -1,7 +1,17 @@
 /// <reference lib="webworker" />
-import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
+import {
+  cleanupOutdatedCaches,
+  createHandlerBoundToURL,
+  precacheAndRoute,
+} from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
-import { notificationTarget, urlBase64ToBytes } from "./pwa/notificationUrl.ts";
+import {
+  applyWorkerBadge,
+  NOTIFICATION_BADGE,
+  NOTIFICATION_ICON,
+  pushNotice,
+  urlBase64ToBytes,
+} from "./pwa/notificationUrl.ts";
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -28,34 +38,37 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("push", (event) => {
-  let title = "Stay In Touch";
-  let body = "New activity in Stay In Touch";
-  let tag = "stay-in-touch";
-  let url = self.registration.scope;
   const raw = event.data?.text() ?? "";
+  let parsed: unknown = null;
   if (raw.length > 0) {
     try {
-      const payload = JSON.parse(raw) as {
-        notification?: { title?: string; body?: string; tag?: string; navigate?: string };
-      };
-      if (payload.notification?.title) title = payload.notification.title;
-      if (payload.notification?.body) body = payload.notification.body;
-      if (payload.notification?.tag) tag = payload.notification.tag;
-      const target = notificationTarget(payload, self.location.origin);
-      if (target) url = target;
+      parsed = JSON.parse(raw);
     } catch {
       // A malformed payload still shows a notification. iOS drops a silent push.
+      parsed = null;
     }
   }
+  const notice = pushNotice(parsed, self.location.origin);
+  const nav = self.navigator as {
+    setAppBadge?: (count: number) => Promise<void>;
+    clearAppBadge?: () => Promise<void>;
+  };
   const options = {
-    body,
-    tag,
+    body: notice.body,
+    tag: notice.tag,
     renotify: true,
     lang: "en",
     dir: "ltr" as NotificationDirection,
-    data: { url },
+    icon: NOTIFICATION_ICON,
+    badge: NOTIFICATION_BADGE,
+    data: { url: notice.url ?? self.registration.scope },
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(notice.title, options),
+      applyWorkerBadge(notice.appBadge, nav),
+    ]),
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {
@@ -71,9 +84,9 @@ self.addEventListener("pushsubscriptionchange", (event) => {
   change.waitUntil(
     (async () => {
       const configured = import.meta.env.VITE_VAPID_PUBLIC_KEY?.trim() ?? "";
-      const applicationServerKey =
-        change.oldSubscription?.options.applicationServerKey ??
-        (configured ? urlBase64ToBytes(configured) : null);
+      const applicationServerKey = configured
+        ? urlBase64ToBytes(configured)
+        : (change.oldSubscription?.options.applicationServerKey ?? null);
       if (!applicationServerKey) return;
       const next = await self.registration.pushManager.subscribe({
         userVisibleOnly: true,

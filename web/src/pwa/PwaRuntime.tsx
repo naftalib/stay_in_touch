@@ -3,7 +3,11 @@ import { useLocation } from "react-router";
 import { useAuth } from "../auth/AuthContext.tsx";
 import InstallCard from "./InstallCard.tsx";
 import PermissionCard from "./PermissionCard.tsx";
-import { ensurePushRegistered, registerChangedSubscription } from "./pushClient.ts";
+import {
+  devicePushDisabled,
+  ensurePushRegistered,
+  registerChangedSubscription,
+} from "./pushClient.ts";
 import styles from "./PwaChrome.module.css";
 import UpdatePrompt from "./UpdatePrompt.tsx";
 
@@ -27,7 +31,7 @@ export default function PwaRuntime() {
         p256dh?: string;
         auth?: string;
       } | null;
-      if (data?.type === "PUSH_SUBSCRIPTION_CHANGED") {
+      if (data?.type === "PUSH_SUBSCRIPTION_CHANGED" && !devicePushDisabled()) {
         void registerChangedSubscription(data).catch(() => undefined);
       }
       if (data?.type === "NAVIGATE" && data.url) {
@@ -49,4 +53,3 @@ export default function PwaRuntime() {
     </div>
   );
 }
-

@@ -5,11 +5,7 @@ import { useFamily } from "../family/FamilyProvider.tsx";
 import { getSupabase } from "../lib/supabase.ts";
 import { INSTALL_DISMISS_KEY, reopenInstallCard } from "./installPrompt.ts";
 import { eightHoursFrom, pausedUntilLabel, tomorrowSevenJerusalem } from "./pauseTime.ts";
-import {
-  currentDeviceSubscribed,
-  enablePushFromTap,
-  releasePushSubscription,
-} from "./pushClient.ts";
+import { currentDeviceSubscribed, disableThisDevice, enableThisDevice } from "./pushClient.ts";
 import styles from "./NotificationSettingsPage.module.css";
 
 type SettingRow = {
@@ -76,11 +72,11 @@ export default function NotificationSettingsPage() {
         onChange={(on) => {
           void (async () => {
             if (on) {
-              const result = await enablePushFromTap();
+              const result = await enableThisDevice();
               setDeviceOn(result === "granted");
               setStatus(result === "granted" ? "Saved" : "Notifications stay off on this device.");
             } else {
-              await releasePushSubscription();
+              await disableThisDevice();
               setDeviceOn(false);
               setStatus("Saved");
             }
