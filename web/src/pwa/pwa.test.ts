@@ -148,6 +148,11 @@ describe("push payload", () => {
     await applyWorkerBadge(0, nav);
     await applyWorkerBadge(null, nav);
     expect(calls).toEqual(["set:3", "clear"]);
+    await expect(
+      applyWorkerBadge(1, {
+        setAppBadge: () => Promise.reject(new Error("badge unavailable")),
+      }),
+    ).resolves.toBeUndefined();
   });
 
   it("treats a different application server key as retired", () => {

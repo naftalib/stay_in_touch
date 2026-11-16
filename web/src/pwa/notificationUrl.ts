@@ -80,8 +80,12 @@ export async function applyWorkerBadge(
   nav: BadgeControls | undefined,
 ): Promise<void> {
   if (count === null || !nav) return;
-  if (count > 0) await nav.setAppBadge?.(count);
-  else await nav.clearAppBadge?.();
+  try {
+    if (count > 0) await nav.setAppBadge?.(count);
+    else await nav.clearAppBadge?.();
+  } catch {
+    // A broken Badge API must not drop the notification that was just shown.
+  }
 }
 
 export function urlBase64ToBytes(value: string): Uint8Array<ArrayBuffer> {

@@ -64,10 +64,19 @@ self.addEventListener("push", (event) => {
     data: { url: notice.url ?? self.registration.scope },
   };
   event.waitUntil(
-    Promise.all([
-      self.registration.showNotification(notice.title, options),
-      applyWorkerBadge(notice.appBadge, nav),
-    ]),
+    (async () => {
+      await self.registration.showNotification(notice.title, options);
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of windows) {
+        client.postMessage({
+          type: "PUSH_SHOWN",
+          title: notice.title,
+          body: notice.body,
+          tag: notice.tag,
+        });
+      }
+      await applyWorkerBadge(notice.appBadge, nav);
+    })(),
   );
 });
 
