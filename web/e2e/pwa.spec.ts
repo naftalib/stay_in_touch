@@ -277,23 +277,25 @@ test("push names the space, skips the author, and opens the thread", async ({ pa
   expect(registrationId).toBeTruthy();
   const target = `http://127.0.0.1:5173/f/${FAMILY_ID}/s/${NOA_SPACE}/messages`;
   // getNotifications() crashes headless Chromium. The worker reports the
-  // notification it showed to the open page instead.
-  const shownPromise = page.evaluate(
-    () =>
-      new Promise<{ title: string; body: string; tag: string }>((resolve) => {
-        navigator.serviceWorker.addEventListener("message", (event: MessageEvent) => {
-          const data = event.data as { type?: string; title?: string; body?: string; tag?: string } | null;
-          if (data?.type !== "PUSH_SHOWN" || !data.title || !data.body || !data.tag) return;
-          resolve({ title: data.title, body: data.body, tag: data.tag });
-        });
-      }),
-  );
+  // notification it showed. The listener has to be in place before delivery.
+  await page.evaluate(() => {
+    const pending = new Promise<{ title: string; body: string; tag: string }>((resolve) => {
+      navigator.serviceWorker.addEventListener("message", (event: MessageEvent) => {
+        const data = event.data as { type?: string; title?: string; body?: string; tag?: string } | null;
+        if (data?.type !== "PUSH_SHOWN" || !data.title || !data.body || !data.tag) return;
+        resolve({ title: data.title, body: data.body, tag: data.tag });
+      });
+    });
+    (window as unknown as { __pushShown: typeof pending }).__pushShown = pending;
+  });
   await session.send("ServiceWorker.deliverPushMessage", {
     origin: "http://127.0.0.1:5173",
     registrationId,
     data: captured,
   });
-  const shown = await shownPromise;
+  const shown = await page.evaluate(
+    () => (window as unknown as { __pushShown: Promise<{ title: string; body: string; tag: string }> }).__pushShown,
+  );
   expect(shown).toEqual({
     title: "Stay In Touch",
     body: payload.notification.body,
