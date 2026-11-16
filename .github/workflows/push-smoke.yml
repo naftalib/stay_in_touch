@@ -169,6 +169,8 @@ jobs:
           CI: "true"
           PUSH_SMOKE_PUSH_URL: http://kong:8000/functions/v1/push-send
           PUSH_SEND_SECRET: local-push-dev
+          # One-time check of Playwright's default flag. Remove with the bootstrap push trigger.
+          PUSH_SMOKE_KEEP_BACKGROUND_NETWORKING: "1"
           VAPID_PRIVATE_KEY: ""
           VAPID_PUBLIC_KEY: ""
         run: xvfb-run -a pnpm test:push:real
