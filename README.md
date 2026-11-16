@@ -50,6 +50,8 @@ pnpm test:e2e              # Playwright; needs supabase start, .env, and a built
 
 `pnpm test:e2e` resets the local database, then runs Chromium, WebKit, and the iPhone 13 project one at a time against `http://127.0.0.1:5173`. Set `CI=true` to exercise the production preview build (`pnpm --filter web build` first). `pnpm test:e2e:pwa` builds, then runs that same suite with the service worker (`PWA_E2E=1`). The suite shares one database, so it does not run tests in parallel.
 
+A real push smoke test is separate from that suite. It opens headed Google Chrome and sends one notification through Google (FCM). Run it from the Actions tab (Push smoke test → Run workflow) or locally. A local run with `PUSH_TRANSPORT=webpush` really sends through Google. Steps: [`docs/testing/push-smoke.md`](docs/testing/push-smoke.md).
+
 `pnpm push:keys` writes a throwaway VAPID pair into gitignored `.env.local` and `supabase/functions/.env`. Export `PUSH_TRANSPORT=capture` and `PUSH_SEND_SECRET=local-push-dev` before `supabase start` for local push. Do not commit those files.
 
 `pnpm db:start`, `pnpm db:reset`, and `pnpm db:test` wrap the same Supabase commands.

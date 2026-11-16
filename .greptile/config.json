@@ -32,7 +32,7 @@
     {
       "id": "push-no-message-text",
       "severity": "high",
-      "scope": "supabase/functions/**,web/src/sw.ts",
+      "scope": ["supabase/functions/**", "web/src/sw.ts"],
       "rule": "Push payloads, service-worker notifications, logs, and function responses must not include message text, captions, photo URLs, or subscription keys."
     },
     {

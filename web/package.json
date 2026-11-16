@@ -7,11 +7,12 @@
     "dev": "vite",
     "build": "tsc -b && tsc -p tsconfig.sw.json --pretty false && vite build",
     "lint": "oxlint",
-    "typecheck": "tsc -b --pretty false && tsc -p tsconfig.sw.json --pretty false",
+    "typecheck": "tsc -b --pretty false && tsc -p tsconfig.sw.json --pretty false && tsc -p tsconfig.real-push.json --pretty false",
     "preview": "vite preview",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:e2e:pwa": "pnpm build && PWA_E2E=1 playwright test"
+    "test:e2e:pwa": "pnpm build && PWA_E2E=1 playwright test",
+    "test:push:real": "playwright test -c playwright.real-push.config.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
