@@ -104,6 +104,9 @@ export default function SideNav({
         {userLabel ? (
           <p className={styles.signedInAs}>Signed in as {userLabel}</p>
         ) : null}
+        <Link className={styles.adminLink} to={`/f/${familyId}/notifications`} onClick={onNavigate}>
+          Notifications
+        </Link>
         <TextSizeControl />
         <Button className={styles.switchAccount} onPress={onSignOut}>
           Switch account

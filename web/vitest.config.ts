@@ -1,3 +1,4 @@
+import path from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
@@ -11,6 +12,14 @@ export default defineConfig({
     'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify(
       'vitest-publishable-key',
     ),
+  },
+  resolve: {
+    alias: {
+      'virtual:pwa-register/react': path.resolve(
+        import.meta.dirname,
+        'src/pwa/registerSwStub.ts',
+      ),
+    },
   },
   test: {
     environment: 'jsdom',

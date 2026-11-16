@@ -8,24 +8,38 @@ import {
   TextArea,
   TextField,
 } from "react-aria-components";
-import { mapError, type AppError } from "../lib/errors.ts";
+import { type AppError, mapError } from "../lib/errors.ts";
 import { getSupabase } from "../lib/supabase.ts";
 import ConfirmDialog from "../ui/ConfirmDialog.tsx";
 import { preparePhoto } from "../media/preparePhoto.ts";
 import {
   MAX_PHOTOS_PER_POST,
+  type PhotoDraft,
   sendGate,
   tooManyPhotos,
-  type PhotoDraft,
 } from "../media/photoDraft.ts";
+import { setComposeActive } from "../pwa/composeActivity.ts";
+import {
+  clearDraft,
+  draftStorageKey,
+  readDraft,
+  registerDraftFlush,
+  resumeDraftWrites,
+  writeDraft,
+} from "../pwa/drafts.ts";
+import { PHOTOS_IN_PROGRESS_KEY } from "../pwa/pushClient.ts";
 import { finishUpload, putBlob, reserveUpload } from "../media/upload.ts";
 import type { ThreadMessage } from "./types.ts";
 import styles from "./Composer.module.css";
 
 const MAX_LENGTH = 4000;
 
+const OFFLINE_SEND =
+  "You're offline. Your message is saved and you can send it when you're back online.";
+
 type ComposerProps = {
   spaceId?: string;
+  userId?: string;
   disabled?: boolean;
   disabledReason?: string;
   offline?: boolean;
@@ -37,6 +51,7 @@ type ComposerProps = {
 
 export default function Composer({
   spaceId,
+  userId,
   disabled,
   disabledReason,
   offline,
@@ -45,15 +60,24 @@ export default function Composer({
   onSend,
   onSendPhotos,
 }: ComposerProps) {
-  const [body, setBody] = useState("");
+  const draftKey = userId && spaceId ? draftStorageKey(userId, spaceId) : null;
+  const [body, setBody] = useState(() => (draftKey ? readDraft(draftKey) : ""));
+  const bodyRef = useRef(body);
+  const activeKey = useRef(draftKey);
   const [photos, setPhotos] = useState<PhotoDraft[]>([]);
+  const [photoNotice] = useState(() => {
+    try {
+      return sessionStorage.getItem(PHOTOS_IN_PROGRESS_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<AppError | null>(null);
   const [leaveTo, setLeaveTo] = useState<string | null>(null);
   const filesRef = useRef(new Map<string, File>());
   const cancelledRef = useRef(new Set<string>());
   const abortRef = useRef(new Map<string, AbortController>());
-  const effectiveDisabled = disabled || offline;
   const gate = sendGate(body, photos);
   const busy = photos.some((photo) => photo.phase === "preparing" || photo.phase === "uploading");
 
@@ -61,6 +85,68 @@ export default function Composer({
     if (!replyTo) return;
     document.querySelector<HTMLTextAreaElement>("[data-composer-input]")?.focus();
   }, [replyTo]);
+
+  useEffect(() => {
+    bodyRef.current = body;
+  }, [body]);
+
+  useEffect(() => {
+    if (userId) resumeDraftWrites();
+  }, [userId]);
+
+  useEffect(() => {
+    if (!draftKey) return;
+    const key = draftKey;
+    const unregister = registerDraftFlush(() => writeDraft(key, bodyRef.current));
+    return () => {
+      writeDraft(key, bodyRef.current);
+      unregister();
+    };
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (activeKey.current === draftKey) return;
+    const next = draftKey ? readDraft(draftKey) : "";
+    activeKey.current = draftKey;
+    bodyRef.current = next;
+    setBody(next);
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (!draftKey) return;
+    const key = draftKey;
+    const timer = window.setTimeout(() => {
+      if (activeKey.current !== key) return;
+      writeDraft(key, bodyRef.current);
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [body, draftKey]);
+
+  useEffect(() => {
+    setComposeActive(body.trim().length > 0 || photos.length > 0);
+    return () => setComposeActive(false);
+  }, [body, photos.length]);
+
+  useEffect(() => {
+    const inProgress = photos.some(
+      (photo) => photo.phase === "preparing" || photo.phase === "uploading",
+    );
+    try {
+      if (inProgress) sessionStorage.setItem(PHOTOS_IN_PROGRESS_KEY, "1");
+      else if (!photoNotice) sessionStorage.removeItem(PHOTOS_IN_PROGRESS_KEY);
+    } catch {
+      // ignore
+    }
+  }, [photoNotice, photos]);
+
+  useEffect(() => {
+    if (!photoNotice) return;
+    try {
+      sessionStorage.removeItem(PHOTOS_IN_PROGRESS_KEY);
+    } catch {
+      // ignore
+    }
+  }, [photoNotice]);
 
   useEffect(() => {
     if (!busy) return;
@@ -85,7 +171,7 @@ export default function Composer({
 
   function patch(localId: string, next: Partial<PhotoDraft>) {
     setPhotos((current) =>
-      current.map((photo) => (photo.localId === localId ? { ...photo, ...next } : photo)),
+      current.map((photo) => (photo.localId === localId ? { ...photo, ...next } : photo))
     );
   }
 
@@ -182,7 +268,7 @@ export default function Composer({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (effectiveDisabled || !gate.enabled) return;
+    if (disabled || offline || !gate.enabled) return;
     const trimmed = body.trim();
     const ready = photos.filter((photo) => photo.phase === "ready" && photo.mediaId);
     setSubmitting(true);
@@ -204,6 +290,8 @@ export default function Composer({
       } else {
         await onSend(trimmed, replyTo?.id ?? null);
       }
+      bodyRef.current = "";
+      if (draftKey) clearDraft(draftKey);
       setBody("");
       onCancelReply?.();
     } catch (caught) {
@@ -213,13 +301,11 @@ export default function Composer({
     }
   }
 
-  if (effectiveDisabled) {
+  if (disabled) {
     return (
       <footer className={styles.footer}>
         <p className={styles.disabled} role="status">
-          {offline
-            ? "You're offline. Sending is disabled until you're back online."
-            : (disabledReason ?? "This space is read-only.")}
+          {disabledReason ?? "This space is read-only."}
         </p>
       </footer>
     );
@@ -228,76 +314,82 @@ export default function Composer({
   return (
     <footer className={styles.footer}>
       {replyTo ? <FormReplyBar replyTo={replyTo} onCancel={onCancelReply} /> : null}
-      {spaceId ? (
-        <div className={styles.toolbar}>
-          <FileTrigger
-            acceptedFileTypes={["image/*", "image/heic", "image/heif", ".heic", ".heif"]}
-            allowsMultiple
-            onSelect={(list) => {
-              if (list) void addFiles([...list]);
-            }}
-          >
-            <Button type="button" className={styles.addPhotos}>
-              Add photos
-            </Button>
-          </FileTrigger>
-        </div>
-      ) : null}
-      {photos.length > 0 ? (
-        <ul className={styles.previews}>
-          {photos.map((photo, index) => (
-            <li key={photo.localId} className={styles.preview}>
-              {photo.previewUrl ? (
-                <img src={photo.previewUrl} alt={photo.caption.trim() || "Photo preview"} />
-              ) : (
-                <span>Preparing…</span>
-              )}
-              {photo.phase === "preparing" || photo.phase === "uploading" ? (
-                <div
-                  role="progressbar"
-                  aria-label="Uploading photo"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={Math.round(photo.progress * 100)}
-                >
-                  {photo.phase === "preparing" ? "Preparing" : "Uploading"}
-                </div>
-              ) : null}
-              {photo.phase === "failed" ? (
-                <p role="alert">
-                  {photo.error ?? "Upload failed."}{" "}
-                  <Button
-                    type="button"
-                    className={styles.retry}
-                    onPress={() => {
-                      const file = filesRef.current.get(photo.localId);
-                      if (file) void uploadOne(photo.localId, file);
-                    }}
-                  >
-                    Retry
-                  </Button>
-                </p>
-              ) : null}
-              <Button
-                type="button"
-                className={styles.retry}
-                aria-label={`Remove photo ${index + 1} of ${photos.length}`}
-                onPress={() => removePhoto(photo.localId)}
-              >
-                Remove
+      {spaceId
+        ? (
+          <div className={styles.toolbar}>
+            <FileTrigger
+              acceptedFileTypes={["image/*", "image/heic", "image/heif", ".heic", ".heif"]}
+              allowsMultiple
+              onSelect={(list) => {
+                if (list) void addFiles([...list]);
+              }}
+            >
+              <Button type="button" className={styles.addPhotos}>
+                Add photos
               </Button>
-              <label>
-                Describe this photo (optional)
-                <input
-                  value={photo.caption}
-                  maxLength={200}
-                  onChange={(event) => patch(photo.localId, { caption: event.target.value })}
-                />
-              </label>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+            </FileTrigger>
+          </div>
+        )
+        : null}
+      {photos.length > 0
+        ? (
+          <ul className={styles.previews}>
+            {photos.map((photo, index) => (
+              <li key={photo.localId} className={styles.preview}>
+                {photo.previewUrl
+                  ? <img src={photo.previewUrl} alt={photo.caption.trim() || "Photo preview"} />
+                  : <span>Preparing…</span>}
+                {photo.phase === "preparing" || photo.phase === "uploading"
+                  ? (
+                    <div
+                      role="progressbar"
+                      aria-label="Uploading photo"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={Math.round(photo.progress * 100)}
+                    >
+                      {photo.phase === "preparing" ? "Preparing" : "Uploading"}
+                    </div>
+                  )
+                  : null}
+                {photo.phase === "failed"
+                  ? (
+                    <p role="alert">
+                      {photo.error ?? "Upload failed."}{" "}
+                      <Button
+                        type="button"
+                        className={styles.retry}
+                        onPress={() => {
+                          const file = filesRef.current.get(photo.localId);
+                          if (file) void uploadOne(photo.localId, file);
+                        }}
+                      >
+                        Retry
+                      </Button>
+                    </p>
+                  )
+                  : null}
+                <Button
+                  type="button"
+                  className={styles.retry}
+                  aria-label={`Remove photo ${index + 1} of ${photos.length}`}
+                  onPress={() => removePhoto(photo.localId)}
+                >
+                  Remove
+                </Button>
+                <label>
+                  Describe this photo (optional)
+                  <input
+                    value={photo.caption}
+                    maxLength={200}
+                    onChange={(event) => patch(photo.localId, { caption: event.target.value })}
+                  />
+                </label>
+              </li>
+            ))}
+          </ul>
+        )
+        : null}
       <Form className={styles.form} onSubmit={handleSubmit}>
         <TextField
           name="message"
@@ -323,43 +415,62 @@ export default function Composer({
           />
           <FieldError className={styles.fieldError} />
         </TextField>
-        {body.length > MAX_LENGTH - 200 ? (
-          <p className={styles.counter} aria-live="polite">
-            {MAX_LENGTH - body.length} characters left
-          </p>
-        ) : null}
-        {gate.reason ? (
-          <p className={styles.counter} id="photo-send-reason" role="status">
-            {gate.reason}
-          </p>
-        ) : null}
+        {body.length > MAX_LENGTH - 200
+          ? (
+            <p className={styles.counter} aria-live="polite">
+              {MAX_LENGTH - body.length} characters left
+            </p>
+          )
+          : null}
+        {photoNotice
+          ? <p role="status">Photos from your last visit were not saved. Add them again.</p>
+          : null}
+        {offline
+          ? (
+            <p className={styles.counter} id="offline-send-reason" role="status">
+              {OFFLINE_SEND}
+            </p>
+          )
+          : null}
+        {gate.reason
+          ? (
+            <p className={styles.counter} id="photo-send-reason" role="status">
+              {gate.reason}
+            </p>
+          )
+          : null}
         <Button
           type="submit"
           className={styles.button}
-          isDisabled={submitting || !gate.enabled}
-          aria-describedby={gate.reason ? "photo-send-reason" : undefined}
+          isDisabled={submitting || !gate.enabled || Boolean(offline)}
+          aria-describedby={[
+            offline ? "offline-send-reason" : null,
+            gate.reason ? "photo-send-reason" : null,
+          ]
+            .filter(Boolean)
+            .join(" ") || undefined}
         >
           Send
         </Button>
       </Form>
-      {photos.length >= MAX_PHOTOS_PER_POST ? (
-        <p role="status">You can add up to 10 photos on one message.</p>
-      ) : null}
-      {error ? (
-        <p className={styles.error} role="alert">
-          {error.title}
-        </p>
-      ) : null}
+      {photos.length >= MAX_PHOTOS_PER_POST
+        ? <p role="status">You can add up to 10 photos on one message.</p>
+        : null}
+      {error
+        ? (
+          <p className={styles.error} role="alert">
+            {error.title}
+          </p>
+        )
+        : null}
       <ConfirmDialog
-        request={
-          leaveTo
-            ? {
-                title: "Photos are still uploading",
-                body: "Leave this page? The upload in progress will stop.",
-                confirmLabel: "Leave",
-              }
-            : null
-        }
+        request={leaveTo
+          ? {
+            title: "Photos are still uploading",
+            body: "Leave this page? The upload in progress will stop.",
+            confirmLabel: "Leave",
+          }
+          : null}
         onClose={(confirmed) => {
           const href = leaveTo;
           setLeaveTo(null);
@@ -376,11 +487,13 @@ function FormReplyBar({ replyTo, onCancel }: { replyTo: ThreadMessage; onCancel?
       <span>
         Replying to {replyTo.authorLabel}: {(replyTo.body.split("\n")[0] ?? "").slice(0, 60)}
       </span>
-      {onCancel ? (
-        <Button type="button" className={styles.cancelReply} onPress={onCancel}>
-          Cancel
-        </Button>
-      ) : null}
+      {onCancel
+        ? (
+          <Button type="button" className={styles.cancelReply} onPress={onCancel}>
+            Cancel
+          </Button>
+        )
+        : null}
     </div>
   );
 }

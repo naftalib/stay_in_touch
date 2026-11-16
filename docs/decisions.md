@@ -109,6 +109,29 @@ This index mirrors the old table so existing links to `docs/decisions.md` still 
 | Signed GET caching uses Expires | [0075](./decisions/0075-signed-get-expires.md) |
 | Unattached soft-deletes are orphans | [0076](./decisions/0076-unattached-soft-delete-orphans.md) |
 
+## Install & notifications (handoff 06)
+
+| Topic | ADR |
+|---|---|
+| Service worker via injectManifest | [0077](./decisions/0077-inject-manifest.md) |
+| Cache the app shell only | [0078](./decisions/0078-cache-app-shell-only.md) |
+| Ask before applying an update | [0079](./decisions/0079-update-prompt.md) |
+| Install card and iPhone Home Screen help | [0080](./decisions/0080-install-and-ios-help.md) |
+| PushSender in front of @negrel/webpush | [0081](./decisions/0081-push-sender-boundary.md) |
+| Push payload is who and where only | [0082](./decisions/0082-who-and-where-payload.md) |
+| Who is notified (quiet hours not chosen) | [0083](./decisions/0083-who-is-notified.md) |
+| Enqueue on insert and sweep every minute | [0084](./decisions/0084-outbox-trigger-and-sweep.md) |
+| One notification tag per space | [0085](./decisions/0085-notification-tag-per-space.md) |
+| Notification permission only from a tap | [0086](./decisions/0086-permission-on-tap.md) |
+| Keep the draft, do not send offline | [0087](./decisions/0087-offline-draft-no-queue.md) |
+| Badge is the unread total | [0088](./decisions/0088-app-badge.md) |
+| Real iPhone push is a go-live check | [0089](./decisions/0089-real-iphone-deferred.md) |
+| Greptile reviews when a pull request opens | [0090](./decisions/0090-greptile-config.md) |
+| A shared device follows the signed-in person | [0091](./decisions/0091-subscription-ownership-move.md) |
+| Finished outbox rows last seven days | [0092](./decisions/0092-outbox-retention.md) |
+| Icons from one SVG, no splash set | [0093](./decisions/0093-pwa-icons.md) |
+| Send-time audience does not use auth.uid() | [0094](./decisions/0094-service-role-audience.md) |
+
 ## Future additions
 
 | Topic | ADR |

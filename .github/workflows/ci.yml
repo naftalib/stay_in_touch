@@ -38,6 +38,14 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 3.1.0
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.8
+      - name: Generate throwaway VAPID keys
+        run: |
+          deno run --allow-net --allow-env scripts/push-keys.ts --github-env > /tmp/vapid.env
+          grep '^::add-mask::' /tmp/vapid.env
+          grep '^[A-Z0-9_]*=' /tmp/vapid.env >> "$GITHUB_ENV"
       - name: Start Supabase (auth, API, Realtime, Mailpit, Edge Runtime)
         env:
           # Edge runtime runs on the Supabase Docker network; Mailpit is reachable as inbucket:8025.
@@ -50,6 +58,11 @@ jobs:
           MEDIA_PUBLIC_BASE_URL: http://127.0.0.1:54321
           MEDIA_UPLOAD_MAX_BYTES: "5242880"
           MEDIA_CLEANUP_SECRET: local-cleanup-dev
+          PUSH_TRANSPORT: capture
+          PUSH_SEND_SECRET: local-push-dev
+          VAPID_SUBJECT: mailto:admin@example.test
+          VAPID_PUBLIC_KEY: ${{ env.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ env.VAPID_PRIVATE_KEY }}
         run: |
           free_ports() {
             supabase stop --no-backup || true

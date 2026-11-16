@@ -1,0 +1,44 @@
+{
+  "autoReview": ["open"],
+  "strictness": 2,
+  "ignorePatterns": "web/src/lib/database.types.ts\ndocs/build-log/**\npnpm-lock.yaml\n**/deno.lock\n**/dist/**\nnode_modules/**\n",
+  "instructions": "Stay In Touch is a private invite-only family app for grandparents and children. Decisions are recorded as ADRs in docs/decisions/ (index docs/decisions.md) and in docs/architecture.md. Don't suggest a change that contradicts an accepted ADR; say it conflicts with ADR NNNN instead. Access rules live in SQL (RLS and security-definer RPCs with search_path = ''). Free tiers only; nothing that needs a card. Push payloads, logs, and responses must not include message text, captions, photo URLs, or keys.",
+  "rules": [
+    {
+      "id": "no-tailwind",
+      "severity": "high",
+      "rule": "Do not add Tailwind or utility CSS. Use CSS Modules and the tokens in web/src/styles/tokens.css."
+    },
+    {
+      "id": "base-text-20px",
+      "severity": "medium",
+      "rule": "Base text stays at least 20px via var(--text-step-normal)."
+    },
+    {
+      "id": "targets-48px",
+      "severity": "medium",
+      "rule": "Interactive targets are at least 48px via var(--size-touch-min)."
+    },
+    {
+      "id": "logical-css",
+      "severity": "medium",
+      "rule": "Use logical CSS properties such as inline-size, block-size, and padding-inline."
+    },
+    {
+      "id": "english-only",
+      "severity": "low",
+      "rule": "User-facing copy is English."
+    },
+    {
+      "id": "push-no-message-text",
+      "severity": "high",
+      "scope": "supabase/functions/**,web/src/sw.ts",
+      "rule": "Push payloads, service-worker notifications, logs, and function responses must not include message text, captions, photo URLs, or subscription keys."
+    },
+    {
+      "id": "no-secrets",
+      "severity": "high",
+      "rule": "Do not commit secrets, service-role keys, or VAPID private keys."
+    }
+  ]
+}

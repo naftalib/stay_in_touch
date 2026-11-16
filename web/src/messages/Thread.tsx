@@ -27,7 +27,7 @@ type ThreadProps = {
 };
 
 export default function Thread({ familyId, spaceId, spaceTitle, archived }: ThreadProps) {
-  const { memberId, role, membership } = useFamily();
+  const { memberId, role, membership, userId } = useFamily();
   const queryClient = useQueryClient();
   const spacesQuery = useSpaces(familyId);
   const messagesQuery = useMessagesQuery(spaceId);
@@ -236,11 +236,13 @@ export default function Thread({ familyId, spaceId, spaceTitle, archived }: Thre
       )}
 
       <Composer
+        key={`${userId ?? "signed-out"}:${spaceId}`}
         disabled={archived}
         disabledReason={
           archived ? "This space is archived. You can read it but not post." : undefined
         }
         offline={offline}
+        userId={userId}
         replyTo={replyTo}
         onCancelReply={() => setReplyTo(null)}
         onSend={handleSend}

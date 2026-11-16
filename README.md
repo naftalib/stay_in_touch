@@ -48,7 +48,9 @@ pnpm test                  # Vitest unit tests in web/
 pnpm test:e2e              # Playwright; needs supabase start, .env, and a built or running app
 ```
 
-`pnpm test:e2e` resets the local database, then runs Chromium, WebKit, and the iPhone 13 project one at a time against `http://127.0.0.1:5173`. Set `CI=true` to exercise the production preview build (`pnpm --filter web build` first). The suite shares one database, so it does not run tests in parallel.
+`pnpm test:e2e` resets the local database, then runs Chromium, WebKit, and the iPhone 13 project one at a time against `http://127.0.0.1:5173`. Set `CI=true` to exercise the production preview build (`pnpm --filter web build` first). `pnpm test:e2e:pwa` builds, then runs that same suite with the service worker (`PWA_E2E=1`). The suite shares one database, so it does not run tests in parallel.
+
+`pnpm push:keys` writes a throwaway VAPID pair into gitignored `.env.local` and `supabase/functions/.env`. Export `PUSH_TRANSPORT=capture` and `PUSH_SEND_SECRET=local-push-dev` before `supabase start` for local push. Do not commit those files.
 
 `pnpm db:start`, `pnpm db:reset`, and `pnpm db:test` wrap the same Supabase commands.
 

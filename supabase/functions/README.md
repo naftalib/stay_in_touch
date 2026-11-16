@@ -9,6 +9,7 @@
 | `media-finish`     | User JWT                                        | Checks the stored JPEG and marks the row ready or failed                                                      |
 | `media-view-urls`  | User JWT                                        | Signed GET links for up to 60 ready photos, one hour                                                          |
 | `media-cleanup`    | `x-media-cleanup-secret` (`verify_jwt = false`) | Deletes orphan objects older than 24 hours, then their rows                                                   |
+| `push-send`        | `x-push-send-secret` (`verify_jwt = false`)     | Claims the outbox, sends who-and-where Web Push, records the result                                           |
 
 Shared code lives in `_shared/` (not deployed as its own function).
 
@@ -23,9 +24,12 @@ Required secrets: `EMAIL_TRANSPORT=mailpit`, `APP_URL=http://127.0.0.1:5173`, `E
 
 Photo functions also need `MEDIA_PROVIDER=supabase`, `MEDIA_BUCKET=photos`,
 `MEDIA_PUBLIC_BASE_URL=http://127.0.0.1:54321`, `MEDIA_UPLOAD_MAX_BYTES=5242880`, and
-`MEDIA_CLEANUP_SECRET` (local value only, not committed). Export them before `supabase start` so the
-edge runtime receives them. The service-role key is injected by the CLI and must not be logged or
-returned.
+`MEDIA_CLEANUP_SECRET` (local value only, not committed). Push also needs `PUSH_TRANSPORT`
+(`capture` locally, `webpush` when a real push service should be called), `PUSH_SEND_SECRET`,
+`VAPID_SUBJECT`, `VAPID_PUBLIC_KEY`, and `VAPID_PRIVATE_KEY`. `pnpm push:keys` writes a throwaway
+pair into the gitignored env files. Export the variables before `supabase start` so the edge
+runtime receives them. The service-role key is injected by the CLI and must not be logged or
+returned. `push-send` logs subscription ids and HTTP status only.
 
 When functions are invoked through local Kong (for example Playwright E2E), they run inside the
 Supabase Docker network. Export `MAILPIT_URL=http://inbucket:8025` before `supabase start`, or rely

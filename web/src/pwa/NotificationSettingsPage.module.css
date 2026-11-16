@@ -1,0 +1,68 @@
+.page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-block-size: 0;
+  overflow: auto;
+  padding: var(--space-4);
+  max-inline-size: 40rem;
+}
+
+.page h1,
+.page h2,
+.page p {
+  margin: 0;
+}
+
+.page button,
+.spaces label {
+  min-block-size: var(--size-touch-min);
+  font-size: var(--text-step-normal);
+}
+
+.page button {
+  padding-inline: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: start;
+}
+
+.page button:focus-visible,
+.spaces label:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.actions,
+.spaces {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.track {
+  inline-size: 2.75rem;
+  block-size: 1.5rem;
+  border-radius: 999px;
+  background: var(--color-border);
+  display: inline-block;
+  margin-inline-end: var(--space-3);
+}
+
+.page label[data-selected] .track {
+  background: var(--color-accent);
+}
+
+.page a {
+  color: var(--color-accent);
+  min-block-size: var(--size-touch-min);
+  display: inline-flex;
+  align-items: center;
+}

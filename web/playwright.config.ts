@@ -24,9 +24,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: process.env.CI ? "pnpm preview" : "pnpm dev",
+    command: process.env.CI || process.env.PWA_E2E ? "pnpm preview" : "pnpm dev",
     url: "http://127.0.0.1:5173",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !process.env.CI && !process.env.PWA_E2E,
     cwd: import.meta.dirname,
     timeout: 120_000,
   },
