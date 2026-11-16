@@ -13,7 +13,7 @@ describe("Greptile config", () => {
       triggerOnDrafts?: boolean;
       triggerOnUpdates?: boolean;
       skipReview?: boolean;
-      rules?: { rule?: string }[];
+      rules?: { id?: string; rule?: string; scope?: string | string[] }[];
     };
     expect(config.autoReview).toEqual(["open"]);
     expect(config.strictness).toBe(2);
@@ -21,7 +21,12 @@ describe("Greptile config", () => {
     expect(config.triggerOnUpdates).toBeUndefined();
     expect(config.skipReview).toBeUndefined();
     expect(config.rules?.length).toBeGreaterThan(0);
-    for (const rule of config.rules ?? []) expect(typeof rule.rule).toBe("string");
+    for (const rule of config.rules ?? []) {
+      expect(typeof rule.rule).toBe("string");
+      if (rule.scope !== undefined) expect(Array.isArray(rule.scope)).toBe(true);
+    }
+    const pushRule = config.rules?.find((rule) => rule.id === "push-no-message-text");
+    expect(pushRule?.scope).toEqual(["supabase/functions/**", "web/src/sw.ts"]);
 
     const files = JSON.parse(readFileSync(path.join(root, ".greptile/files.json"), "utf8")) as {
       files: { path: string; description: string }[];

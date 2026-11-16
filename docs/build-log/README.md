@@ -18,3 +18,8 @@ Copy [`_template.md`](./_template.md) when starting a new entry. Keep entries sh
 |---|---|---|
 | 01 | [Repo skeleton and database](./01-repo-skeleton-and-database.md) | 12 Nov 2026 |
 | 02 | [Build journal](./02-build-journal.md) | 12 Nov 2026 |
+| 03 | [First screens](./03-first-screens.md) | 12 Nov 2026 |
+| 04 | [Invites and admin](./04-invites-and-admin.md) | 15 Nov 2026 |
+| 05 | [Photos](./05-photos.md) | 15 Nov 2026 |
+| 06 | [Install, notifications and offline](./06-pwa-push.md) | 16 Nov 2026 |
+| 07 | [Real push smoke test](./07-push-smoke-test.md) | 16 Nov 2026 |

@@ -51,7 +51,7 @@ flowchart LR
 | `supabase/functions/` | `invite-send`, media upload/finish/view/cleanup, `push-send` | **Implemented** |
 | `api/` | Later AI / Python services | README only |
 | `docs/` | Architecture, ADRs, build log, hosted checklist | Living docs |
-| `.github/workflows/` | Web unit tests, E2E vs local Supabase, database CI | **Implemented** |
+| `.github/workflows/` | Pull-request CI (web, e2e, functions, db) and the on-demand push smoke test | **Implemented** |
 
 For roles, tables, RLS, RPCs, and Realtime behavior, see the sections below. Planning ADRs are in [`docs/decisions/`](./decisions/).
 
@@ -237,6 +237,20 @@ Enqueue still calls `private.space_viewer_member_ids`, which needs the author's 
 The push module is `supabase/functions/_shared/push/`. Client RPCs, granted to `authenticated`: `register_push_subscription`, `unregister_push_subscription`, `set_space_muted`, `set_notifications_enabled`, `set_notifications_paused`, `my_notification_settings`. Service RPCs, granted to `service_role`: `claim_push_batch`, `push_group_facts`, `record_push_result`, `record_push_delivery`, `delivered_push_subscriptions`, `prune_notification_outbox`, `unread_total`.
 
 While the app is open, `setAppBadge` uses that family's unread total and clears at zero. The push payload's `app_badge` is `private.unread_total` across families. The worker applies that count, and shows the app icon and the monochrome badge. Turning this device off is remembered in `localStorage` and blocks the next automatic subscribe. A subscription on a retired VAPID key is replaced on the next open.
+
+## Testing
+
+Each layer checks a different part of the path. Together they are what we run before a change is trusted.
+
+| Layer | What it runs | What a pass means |
+|---|---|---|
+| pgTAP | `pnpm db:test` | RLS, grants, enqueue, claim, and the service-role audience. Inserts in these tests build their own fixtures. |
+| Deno | `deno test` in `supabase/functions` | `push-send` and the other functions, with a stubbed sender. No network call to FCM. |
+| Vitest | `pnpm test` | UI units, the who-and-where payload helper, and the Greptile config. |
+| Playwright e2e | `pnpm test:e2e` | The app against local Supabase. Push uses `PUSH_TRANSPORT=capture` and a stubbed `PushManager`. CDP `ServiceWorker.deliverPushMessage` hands the captured payload to the worker. A pass means the worker shows who and where from that payload. |
+| Real push smoke | `pnpm test:push:real`, or Actions → Push smoke test | One post by Grandma, the database trigger, `pg_net`, `push-send` with `webpush`, FCM, and headed Google Chrome. The service worker's `__lastPush` is plaintext Chrome produced by decrypting the `aes128gcm` body. |
+
+The smoke test is not part of pull-request CI (ADR 0095). Its spec lives in `web/e2e-real-push/` so `pnpm test:e2e` does not pick it up. Still uncovered: Apple Push Notification service, a physical iPhone or Android device, and Firefox. How to run it: [`docs/testing/push-smoke.md`](./testing/push-smoke.md).
 
 ## Media flow (later)
 

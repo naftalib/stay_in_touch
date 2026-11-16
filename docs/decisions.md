@@ -132,6 +132,13 @@ This index mirrors the old table so existing links to `docs/decisions.md` still 
 | Icons from one SVG, no splash set | [0093](./decisions/0093-pwa-icons.md) |
 | Send-time audience does not use auth.uid() | [0094](./decisions/0094-service-role-audience.md) |
 
+## Push smoke test (handoff 07)
+
+| Topic | ADR |
+|---|---|
+| Real push smoke test on demand, with an optional weekly run | [0095](./decisions/0095-real-push-smoke-test.md) |
+| Headed Chrome, persistent profile, xvfb | [0096](./decisions/0096-headed-chrome-for-real-push.md) |
+
 ## Future additions
 
 | Topic | ADR |

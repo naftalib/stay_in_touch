@@ -19,7 +19,8 @@
     "push:keys": "deno run --allow-net --allow-env --allow-read --allow-write --allow-run scripts/push-keys.ts",
     "test": "pnpm --filter web test",
     "test:e2e": "pnpm --filter web test:e2e",
-    "test:e2e:pwa": "pnpm --filter web test:e2e:pwa"
+    "test:e2e:pwa": "pnpm --filter web test:e2e:pwa",
+    "test:push:real": "pnpm --filter web test:push:real"
   },
   "devDependencies": {
     "oxfmt": "0.78.0"
