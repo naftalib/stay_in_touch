@@ -71,8 +71,8 @@ async function shownNotifications(page: Page): Promise<Note[] | "unavailable"> {
   }
 }
 
-test("headed Chrome receives a decrypted who-and-where push", async (fixtures, testInfo) => {
-  void fixtures;
+test("headed Chrome receives a decrypted who-and-where push", async ({ browserName }, testInfo) => {
+  void browserName;
   if (testInfo.retry > 0) {
     console.log(`push-smoke retry=${testInfo.retry} previous attempt failed`);
   }
