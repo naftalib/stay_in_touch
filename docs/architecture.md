@@ -206,9 +206,9 @@ sequenceDiagram
 
 ## Install, offline, and push (handoff 06)
 
-The production build registers `web/src/sw.ts` (Workbox `injectManifest`). `pnpm dev` does not. The worker precaches the app shell only: HTML, JS, CSS, fonts, and icons. It does not precache the lazy `heic-to` chunk and it does not cache Supabase REST, RPC, Auth, Realtime, Functions, or Storage. A navigation falls back to `index.html` except `/auth/`, `/functions/`, `/rest/`, and `/storage/`. Preview sends `Cache-Control: no-cache` for `sw.js` and `index.html`. A waiting worker shows "A new version of Stay In Touch is ready" and does not reload while the composer has text or a photo upload is in progress.
+The production build registers `web/src/sw.ts` (Workbox `injectManifest`). `pnpm dev` does not. The worker precaches the app shell only: HTML, JS, CSS, fonts, and icons. It does not precache the lazy `heic-to` chunk and it does not cache Supabase REST, RPC, Auth, Realtime, Functions, or Storage. A navigation falls back to `index.html` except `/auth/`, `/functions/`, `/rest/`, and `/storage/`. Preview sends `Cache-Control: no-cache` for `sw.js` and `index.html`. A waiting worker shows "A new version of Stay In Touch is ready" and does not reload while the composer has text or a photo upload is in progress. Later hides that prompt until the next app open or a newer worker. Only the tab that presses Update now reloads.
 
-Offline, the connection banner stays and the composer stays. Send is disabled. The draft text is in `localStorage` for that person and space, and it is cleared on send and on sign-out. Photos are not kept across a reload.
+Offline, the connection banner stays and the composer stays. Send is disabled. The draft text is in `localStorage` for that person and space. It is written when the person leaves the space and when the composer unmounts, and it is cleared on send and on sign-out. Sign-out suspends draft writes first. Photos are not kept across a reload.
 
 `/f/:familyId/notifications` is linked next to text size. It can turn this device on or off, turn all notifications off, pause for 8 hours or until 07:00 Asia/Jerusalem, and mute one visible space. Pause and the all-off switch take `p_family_id` because one person can belong to more than one family (ADR 0015).
 
@@ -222,19 +222,21 @@ sequenceDiagram
   Browser->>PG: insert message
   PG->>PG: enqueue viewers<br/>except author, muted, paused
   PG->>EF: pg_net POST<br/>when Vault secrets exist
-  EF->>PG: claim and re-check prefs
+  EF->>PG: claim, audience, deleted<br/>service role, no auth.uid
   EF->>Push: who and where only<br/>Declarative Web Push JSON
   Push->>SW: push event
-  SW->>Browser: notification<br/>tag space id
+  SW->>Browser: notification and badge<br/>tag space id
   Browser->>SW: click
   SW->>Browser: open the thread
 ```
 
-A one-minute `pg_cron` sweep retries rows the immediate call missed, and deletes sent, skipped, and failed rows older than 7 days. Both the trigger's HTTP call and the sweep run only when Vault holds `push_send_secret` and `push_send_url`. The sender is `PushSender`: `webpush` (`@negrel/webpush`) or `capture`. A 404 or 410 deletes the subscription. 429 and 5xx back off 1, 5, then 15 minutes and stop after 4 attempts. 400 and 413 are failed. No remaining device is `skipped` / `no_device`.
+A one-minute `pg_cron` sweep retries rows the immediate call missed, and deletes sent, skipped, and failed rows older than 7 days. Both the trigger's HTTP call and the sweep run only when Vault holds `push_send_secret` and `push_send_url`. The sender is `PushSender`: `webpush` (`@negrel/webpush`) or `capture`. A 404 or 410 deletes the subscription. 429 and 5xx back off 1, 5, then 15 minutes and stop after 4 attempts. 400 and 413 are failed and are not retried once another device has accepted the row. No remaining device is `skipped` / `no_device`. A deleted post is `skipped` / `deleted`. `push_deliveries` remembers which subscription accepted which rows, so a retry does not send the same row to a device that already returned 201.
 
-The push module is `supabase/functions/_shared/push/`. Client RPCs, granted to `authenticated`: `register_push_subscription`, `unregister_push_subscription`, `set_space_muted`, `set_notifications_enabled`, `set_notifications_paused`, `my_notification_settings`. Service RPCs, granted to `service_role`: `claim_push_batch`, `push_group_facts`, `record_push_result`, `prune_notification_outbox`, `unread_total`.
+Enqueue still calls `private.space_viewer_member_ids`, which needs the author's session. Send-time and `private.unread_total` call `private.space_audience_member_ids` (ADR 0094). That function is not granted to clients. An insert with no JWT still enqueues nobody.
 
-While the app is open, `setAppBadge` uses that family's unread total and clears at zero. The push payload's `app_badge` is `private.unread_total` across families.
+The push module is `supabase/functions/_shared/push/`. Client RPCs, granted to `authenticated`: `register_push_subscription`, `unregister_push_subscription`, `set_space_muted`, `set_notifications_enabled`, `set_notifications_paused`, `my_notification_settings`. Service RPCs, granted to `service_role`: `claim_push_batch`, `push_group_facts`, `record_push_result`, `record_push_delivery`, `delivered_push_subscriptions`, `prune_notification_outbox`, `unread_total`.
+
+While the app is open, `setAppBadge` uses that family's unread total and clears at zero. The push payload's `app_badge` is `private.unread_total` across families. The worker applies that count, and shows the app icon and the monochrome badge. Turning this device off is remembered in `localStorage` and blocks the next automatic subscribe. A subscription on a retired VAPID key is replaced on the next open.
 
 ## Media flow (later)
 

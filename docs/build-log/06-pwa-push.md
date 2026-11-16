@@ -31,15 +31,73 @@ Precache: 19 entries, 851.37 KiB. The `heic-to` chunk is not in it.
 
 ## Review findings and how each was resolved
 
-Left for the reviewer.
+Reviewer: Grok 4.7, a separate agent from the builder. Head at review start was `dc72726`.
+
+The send path never delivered a push. `push_group_facts` and `private.unread_total` call `space_viewer_member_ids`, and that function only returns members of the caller's families. The edge function uses the service role, which has no `auth.uid()`, so every row was `skipped` / `not_member` and the badge was 0. Enqueue still worked, because the trigger runs in the author's session.
+
+The tests missed it for three reasons. pgTAP runs as `postgres`, and `assert_service_role` accepts that session, so a logged-in caller still had `auth.uid()`. The Deno tests stubbed `eligible: true`. The Playwright test never called `push-send`. It checked that `sent_payload` did not contain the message text, and a null payload passes that check. `web/e2e/pwa.spec.ts` even noted that a superuser insert with no JWT notifies nobody.
+
+Enqueue stays on `space_viewer_member_ids`. Pointing it at the unscoped audience function would make fixture and seed inserts (no JWT) create outbox rows and would make `claim_push_batch` order-dependent. A SQL insert with no JWT still enqueues nobody. The app always inserts as the author. ADR 0094.
 
 ### Greptile review
 
-The pull request is not open yet, so Greptile has not commented. The reviewer fills this table.
+Greptile reviewed `dc72726` at confidence 0/5 (review 5922171121, 2026-11-16). Ten inline comments, all fixed. The summary in the pull request body ("Do not merge yet: push delivery skips every recipient, and draft and update flows can discard work") restates those ten and is covered by the same commits. No issue comments. `autoReview` stays `["open"]`.
 
 | # | Comment | File:line | Action | Reason or commit |
 |---|---|---|---|---|
-| | | | | |
+| 1 | Push skips every recipient because the service role has no `auth.uid()` | `supabase/migrations/20261116120000_push.sql:629` | fixed | `97091fa`. New `private.space_audience_member_ids`. pgTAP `114_push_service_role.sql` runs as `service_role` with a null uid and expects Mom eligible. The Playwright test calls `push-send` and reads Noa's captured payload. |
+| 2 | Switching spaces overwrites the other draft | `web/src/messages/Composer.tsx:63` | fixed | `055d7d7`. Flush and reload on the draft key. The composer remounts per person and space. Composer test. |
+| 3 | The debounce drops the last edit on unmount | `web/src/messages/Composer.tsx:90` | fixed | `055d7d7`. Unmount and space change write `bodyRef`. Composer test. |
+| 4 | `controllerchange` reloads other tabs and can drop an upload | `web/src/pwa/UpdatePrompt.tsx:47` | fixed | `055d7d7`. Reload only after this tab pressed Update now. ADR 0079. Vitest. |
+| 5 | "This device off" subscribes again on the next open | `web/src/pwa/pushClient.ts:100` | fixed | `055d7d7`. `sit-push-device-off`. Sign-out does not set it. A browser-rotated subscription is not saved while it is set. ADR 0086. Vitest. |
+| 6 | A subscription on a retired VAPID key is saved again | `web/src/pwa/pushClient.ts:100` | fixed | `055d7d7`. Compare `applicationServerKey` and re-subscribe. The worker prefers `VITE_VAPID_PUBLIC_KEY` on `pushsubscriptionchange`. ADR 0086. Vitest. |
+| 7 | One device's 201 stops retries for the others | `supabase/functions/push-send/handler.ts:209` | fixed | `97091fa`. `push_deliveries`. A 429 or 5xx keeps the group pending. A subscription is skipped only after it accepted every row in the claim. Deno test and pgTAP 114. |
+| 8 | Later hides a newer update for the whole session | `web/src/pwa/UpdatePrompt.tsx:66` | fixed | `055d7d7`. Session dismissal clears when a newer worker fires `updatefound`, not on the hourly check. ADR 0079 matches the handoff. Vitest. |
+| 9 | The worker ignores `app_badge` | `web/src/sw.ts:40` | fixed | `055d7d7`. `setAppBadge` / `clearAppBadge`, plus the icon and monochrome badge. A bad payload still shows a notification. Vitest. |
+| 10 | A deleted post is still notified | `supabase/migrations/20261116120000_push.sql:686` | fixed | `97091fa`. Send-time `skip_reason` `deleted`, after `not_member`. pgTAP 114. The function source still has no message body. |
+
+### Other review findings
+
+| Item | Result | Where |
+|---|---|---|
+| Ineligible rows in one group shared the first skip reason | fixed | `97091fa`. One `record_push_result` call per reason. Deno test. |
+| The shown notification had no icon or monochrome badge | fixed | `055d7d7`. `/pwa-192.png` and `/badge-96.png`. Handoff section 6. |
+| A device that accepted one post was treated as finished for a newer post claimed with the retry | fixed | `97091fa`. `delivered_push_subscriptions` requires a row for every id. pgTAP 114. |
+| Real web-push smoke test | not added | Later decision, as requested. |
+
+Checklist sections 1–6 and 8–10, from the code and the suites below. Pass unless noted.
+
+1. Privacy. Payload builder has no message-text parameter (`payload.ts`). pgTAP 112 rejects `messages.body` in `push_group_facts`. The new e2e asserts the marker is absent from the captured row and from the function response, and that `navigate` is the app route. Display name is the family label. Logs in the handler are status codes and subscription ids.
+2. Subscriptions. Existing pgTAP covers ownership move, non-https endpoints, and anon. 404/410 still deletes. The worker shows a generic notification for a bad payload. Sign-out still unregisters and does not set device-off.
+3. Outbox. Catalog test 111 includes the new names. Advisors reported no warnings. The trigger's two steps stay in their own exception blocks. Claim stays `for update skip locked`. Vault still gates the schedule. Secret compare is still SHA-256. 400/413 do not retry once another device succeeded.
+4. Preferences. Pause, mute, and all-off are still re-checked in `push_group_facts`. No quiet-hours code. No delete policy added.
+5. Service worker. `injectManifest` is unchanged. Precache was 19 entries, 851.37 KiB in the builder's production build. This review did not rebuild, so that size was not re-measured. Navigation denylist is unchanged. `skipWaiting` is still only on `SKIP_WAITING`.
+6. Secrets. The new migration has no secret. `pnpm push:keys` still writes only gitignored files. Hosted settings now say a rotated key is compared and a device that is off stays off.
+8. Update prompt. `registerType: 'prompt'` unchanged. Later and the other-tab reload are fixed as in the table. The prompt stays `role="status"`.
+9. Install and offline. Permission is still only from a tap. Device-off is the new exception to auto-register. Drafts clear on sign-out and the unmount cannot restore them. Badge is applied in the worker.
+10. Tests. pgTAP plan counts match. Deno covers the partial device failure and per-reason skips. Vitest covers Later, the reload flag, draft suspend, the badge, the key compare, and device-off. Playwright now posts to `push-send` and asserts the shown notification from the captured payload. `PushManager` is still stubbed only in that test.
+
+Concern: container-to-container IPv4 on this VM does not connect, so this agent could not run Playwright or call `push-send` over HTTP. The database, Deno, and Vitest suites did run. CI runs the browser suite.
+
+### Reviewer local run
+
+Docker 29.1.3, Supabase CLI 3.1.0, Deno 2.9.8, Node 22. The realtime migrator sets `ECTO_IPV6=true`. On the default bridge that connection hung for 15 seconds and `supabase start` aborted. Starting on an IPv6 network got through migrations and seed. PostgREST and the edge runtime then failed their 10 second health checks because IPv4 between containers times out. `supabase start --ignore-health-check` left Postgres up.
+
+```bash
+supabase test db          # run here as pg_prove against 127.0.0.1:54322
+                          # 29 files, 510 tests passed (was 494)
+supabase db lint --fail-on error
+                          # clean after the temporary pgtap extension was dropped
+supabase db advisors --type security --level warn --fail-on warn
+                          # no issues
+cd supabase/functions && deno fmt --check && deno lint && deno check && deno test --allow-env
+                          # 43 passed (was 41)
+pnpm --filter web exec oxlint && pnpm --filter web exec tsc -b && pnpm --filter web exec tsc -p tsconfig.sw.json
+pnpm --filter web exec vitest run
+                          # 11 files, 45 passed (was 38)
+```
+
+Playwright was not run here. `http://127.0.0.1:54321` accepts the TCP connection and then does not answer, because Kong cannot reach the other containers. The production-build browser run is the CI e2e job.
 
 ## Deviations from the plan and why
 

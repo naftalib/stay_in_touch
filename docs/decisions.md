@@ -130,6 +130,7 @@ This index mirrors the old table so existing links to `docs/decisions.md` still 
 | A shared device follows the signed-in person | [0091](./decisions/0091-subscription-ownership-move.md) |
 | Finished outbox rows last seven days | [0092](./decisions/0092-outbox-retention.md) |
 | Icons from one SVG, no splash set | [0093](./decisions/0093-pwa-icons.md) |
+| Send-time audience does not use auth.uid() | [0094](./decisions/0094-service-role-audience.md) |
 
 ## Future additions
 
