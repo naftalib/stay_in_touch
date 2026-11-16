@@ -809,6 +809,15 @@ export type Database = {
       };
       accept_invite: { Args: { p_invitation_id: string }; Returns: string };
       archive_space: { Args: { p_space_id: string }; Returns: undefined };
+      bootstrap_family: {
+        Args: { p_email: string; p_family_name: string; p_label: string; p_user_id: string };
+        Returns: {
+          family_id: string;
+          invitation_id: string;
+          reused: boolean;
+          token: string;
+        }[];
+      };
       change_member_role: {
         Args: { p_member_id: string; p_role: Database["public"]["Enums"]["family_role"] };
         Returns: undefined;

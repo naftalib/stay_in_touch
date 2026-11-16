@@ -80,6 +80,22 @@ There is also a pending invitation for `aunt@example.test`. General has a quote-
 
 pgTAP tests do not use this seed. They build a second family and a removed member of their own, then roll back.
 
+## Deploy and operations
+
+Hosted deploys run from GitHub Actions after CI succeeds on `main`. Test deploys on its own. Production waits for the required reviewer and takes an encrypted backup first. The monthly backup uses that same production environment, so it also waits for approval.
+
+Naftali's steps (create the two Supabase projects, Cloudflare, Gmail, keys, and the GitHub environment names) are in [`docs/go-live/runbook.md`](docs/go-live/runbook.md). The phone checklist is [`docs/go-live/phone-test-plan.md`](docs/go-live/phone-test-plan.md). Settings that are not in `config.toml` are in [`docs/hosted-settings.md`](docs/hosted-settings.md).
+
+The first family is created on your computer, not in Actions:
+
+```bash
+pnpm bootstrap:family --env test --family "The Breuning Family" --email "<first parent>" --label "Mom"
+```
+
+That reads gitignored `.env.test.local` or `.env.production.local` (`SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `APP_URL`). Do not run `supabase/seed.sql` on a hosted project.
+
+`pnpm storage-check` prints photo and database percentages only. `scripts/backup.sh` and `scripts/restore.sh` encrypt with `age`. Never restore production data into the test project.
+
 ## Build journal
 
 How the app was built handoff by handoff: [`docs/build-log/`](docs/build-log/). Architecture decisions: [`docs/decisions.md`](docs/decisions.md).

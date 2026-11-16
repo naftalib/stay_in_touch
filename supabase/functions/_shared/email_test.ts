@@ -61,13 +61,25 @@ Deno.test("resend 429 and 401 become admin-facing errors", async () => {
   try {
     globalThis.fetch = () => Promise.resolve(new Response("quota", { status: 429 }));
     await assertRejects(
-      () => sendEmail({ to: "a@example.test", subject: "Hi", html: "<p>Hi</p>", text: "Hi" }),
+      () =>
+        sendEmail({
+          to: "a@example.test",
+          subject: "Hi",
+          html: "<p>Hi</p>",
+          text: "Hi",
+        }),
       Error,
       "Too many emails today",
     );
     globalThis.fetch = () => Promise.resolve(new Response("nope", { status: 401 }));
     await assertRejects(
-      () => sendEmail({ to: "a@example.test", subject: "Hi", html: "<p>Hi</p>", text: "Hi" }),
+      () =>
+        sendEmail({
+          to: "a@example.test",
+          subject: "Hi",
+          html: "<p>Hi</p>",
+          text: "Hi",
+        }),
       Error,
       "rejected the request",
     );
@@ -87,7 +99,12 @@ Deno.test("resend 429 and 401 become admin-facing errors", async () => {
 
 Deno.test("mailpit is allowed for the Docker kong hostname", async () => {
   const original = globalThis.fetch;
-  const keys = ["EMAIL_TRANSPORT", "SUPABASE_URL", "EMAIL_FROM", "MAILPIT_URL"] as const;
+  const keys = [
+    "EMAIL_TRANSPORT",
+    "SUPABASE_URL",
+    "EMAIL_FROM",
+    "MAILPIT_URL",
+  ] as const;
   const saved: Record<string, string | undefined> = {};
   for (const key of keys) saved[key] = Deno.env.get(key);
   let called = "";
@@ -128,6 +145,91 @@ Deno.test("mailpit is allowed for the Docker kong hostname", async () => {
   }
 });
 
+Deno.test("gmail transport speaks SMTP to a local fake server", async () => {
+  const listener = Deno.listen({ hostname: "127.0.0.1", port: 0 });
+  const port = (listener.addr as Deno.NetAddr).port;
+  let sawPass = false;
+  const conversation = (async () => {
+    const conn = await listener.accept();
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const write = (line: string) => conn.write(encoder.encode(`${line}\r\n`));
+    const readLine = async (): Promise<string> => {
+      while (!buffer.includes("\r\n")) {
+        const chunk = new Uint8Array(4096);
+        const n = await conn.read(chunk);
+        if (n === null) throw new Error("closed");
+        buffer += decoder.decode(chunk.subarray(0, n));
+      }
+      const idx = buffer.indexOf("\r\n");
+      const line = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      return line;
+    };
+    await write("220 localhost ESMTP");
+    const ehlo = await readLine();
+    if (!ehlo.startsWith("EHLO")) throw new Error("expected EHLO");
+    await write("250 AUTH LOGIN");
+    if ((await readLine()) !== "AUTH LOGIN") throw new Error("expected AUTH");
+    await write("334 VXNlcm5hbWU6");
+    await readLine();
+    await write("334 UGFzc3dvcmQ6");
+    const pass = atob(await readLine());
+    sawPass = pass === "local-app-password";
+    await write("235 ok");
+    await readLine();
+    await write("250 ok");
+    await readLine();
+    await write("250 ok");
+    if ((await readLine()) !== "DATA") throw new Error("expected DATA");
+    await write("354 go");
+    while (true) {
+      const line = await readLine();
+      if (line === ".") break;
+    }
+    await write("250 queued");
+    await readLine();
+    conn.close();
+  })();
+
+  const keys = [
+    "EMAIL_TRANSPORT",
+    "GMAIL_SMTP_HOST",
+    "GMAIL_SMTP_PORT",
+    "GMAIL_SMTP_TLS",
+    "GMAIL_SMTP_USER",
+    "GMAIL_SMTP_PASS",
+    "EMAIL_FROM",
+  ] as const;
+  const saved: Record<string, string | undefined> = {};
+  for (const key of keys) saved[key] = Deno.env.get(key);
+  Deno.env.set("EMAIL_TRANSPORT", "gmail");
+  Deno.env.set("GMAIL_SMTP_HOST", "127.0.0.1");
+  Deno.env.set("GMAIL_SMTP_PORT", String(port));
+  Deno.env.set("GMAIL_SMTP_TLS", "off");
+  Deno.env.set("GMAIL_SMTP_USER", "sender@example.test");
+  Deno.env.set("GMAIL_SMTP_PASS", "local-app-password");
+  Deno.env.set("EMAIL_FROM", "Stay In Touch <sender@example.test>");
+  try {
+    await sendEmail({
+      to: "parent@example.test",
+      subject: "Hello",
+      html: "<p>Hello</p>",
+      text: "Hello",
+    });
+    await conversation;
+    assertEquals(sawPass, true);
+  } finally {
+    listener.close();
+    for (const key of keys) {
+      const value = saved[key];
+      if (value) Deno.env.set(key, value);
+      else Deno.env.delete(key);
+    }
+  }
+});
+
 Deno.test("gmail transport refuses header injection and missing credentials", async () => {
   const saved = {
     transport: Deno.env.get("EMAIL_TRANSPORT"),
@@ -140,7 +242,13 @@ Deno.test("gmail transport refuses header injection and missing credentials", as
     Deno.env.delete("GMAIL_SMTP_USER");
     Deno.env.delete("GMAIL_SMTP_PASS");
     await assertRejects(
-      () => sendEmail({ to: "a@example.test", subject: "Hi", html: "<p>Hi</p>", text: "Hi" }),
+      () =>
+        sendEmail({
+          to: "a@example.test",
+          subject: "Hi",
+          html: "<p>Hi</p>",
+          text: "Hi",
+        }),
       Error,
       "GMAIL_SMTP_USER",
     );

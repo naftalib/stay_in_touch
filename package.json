@@ -17,6 +17,9 @@
     "db:lint": "supabase db lint --fail-on error && supabase db advisors --type security --level warn --fail-on warn",
     "db:types": "supabase gen types typescript --local > web/src/lib/database.types.ts && pnpm exec oxfmt web/src/lib/database.types.ts",
     "push:keys": "deno run --allow-net --allow-env --allow-read --allow-write --allow-run scripts/push-keys.ts",
+    "bootstrap:family": "deno run --node-modules-dir=none --allow-net --allow-env --allow-read --allow-run scripts/bootstrap-family.ts",
+    "post-deploy-check": "deno run --allow-net scripts/post-deploy-check.ts",
+    "storage-check": "bash scripts/storage-check.sh",
     "test": "pnpm --filter web test",
     "test:e2e": "pnpm --filter web test:e2e",
     "test:e2e:pwa": "pnpm --filter web test:e2e:pwa",
@@ -24,5 +27,8 @@
   },
   "devDependencies": {
     "oxfmt": "0.78.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "workerd"]
   }
 }

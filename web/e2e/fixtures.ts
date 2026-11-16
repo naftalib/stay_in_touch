@@ -55,9 +55,20 @@ export async function signInWithPassword(page: import("@playwright/test").Page, 
   await passwordPanel.getByRole("textbox", { name: "Password" }).fill(user.password);
   await passwordPanel.getByRole("button", { name: "Sign in" }).click();
   await expect(page).not.toHaveURL(/sign-in/, { timeout: 30_000 });
-  await expect(page).toHaveURL(/\/f\/[^/]+\/s\/[^/]+\/messages/, {
-    timeout: 30_000,
-  });
+  // A database reset restarts the API. The first membership fetch can fail
+  // and leave the home page on "Try again" until the containers are ready.
+  const home = /\/f\/[^/]+\/s\/[^/]+\/messages/;
+  await expect
+    .poll(
+      async () => {
+        if (home.test(page.url())) return "ready";
+        const retry = page.getByRole("button", { name: "Try again" });
+        if (await retry.isVisible()) await retry.click();
+        return "waiting";
+      },
+      { timeout: 30_000, intervals: [500, 1000, 1000] },
+    )
+    .toBe("ready");
 }
 
 /** Aside on wide viewports; Spaces drawer dialog on narrow viewports. */

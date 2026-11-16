@@ -1,0 +1,24 @@
+{
+  // Assets only. No Worker script. Preview URLs stay off so the workers.dev
+  // origin is the only address (home-screen installs and push subscriptions).
+  "name": "stay-in-touch",
+  "compatibility_date": "2026-11-16",
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "env": {
+    "test": {
+      "name": "stay-in-touch-test",
+      "workers_dev": true,
+      "preview_urls": false
+    },
+    "production": {
+      "name": "stay-in-touch",
+      "workers_dev": true,
+      "preview_urls": false
+    }
+  }
+}

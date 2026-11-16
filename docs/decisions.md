@@ -139,6 +139,24 @@ This index mirrors the old table so existing links to `docs/decisions.md` still 
 | Real push smoke test on demand, with an optional weekly run | [0095](./decisions/0095-real-push-smoke-test.md) |
 | Headed Chrome, persistent profile, xvfb | [0096](./decisions/0096-headed-chrome-for-real-push.md) |
 
+## Go-live (handoff 08)
+
+| Topic | ADR |
+|---|---|
+| Workers static assets, workers.dev, preview URLs off (refines 0004) | [0097](./decisions/0097-workers-static-assets.md) |
+| Two free Supabase projects | [0098](./decisions/0098-two-free-supabase-projects.md) |
+| Deploy after CI; production required reviewer; account-wide token | [0099](./decisions/0099-deploy-workflow.md) |
+| Gmail app password for Auth and invite email | [0100](./decisions/0100-gmail-app-password.md) |
+| Age-encrypted backups; photo bytes are not in the dump | [0101](./decisions/0101-encrypted-backups.md) |
+| Storage watch at 80 percent | [0102](./decisions/0102-storage-watch.md) |
+| Auth config-as-code for the two remotes | [0103](./decisions/0103-auth-config-as-code.md) |
+| Hosted API CORS cannot be restricted; leaked-password is Pro | [0104](./decisions/0104-hosted-cors-and-leaked-passwords.md) |
+| First-family bootstrap; seed never on hosted | [0105](./decisions/0105-first-family-bootstrap.md) |
+| Staged rollout and rollback | [0106](./decisions/0106-staged-rollout-and-rollback.md) |
+| Explicitly not built at go-live | [0107](./decisions/0107-not-built-at-go-live.md) |
+| Every production backup waits for the production reviewer | [0108](./decisions/0108-production-backup-approval.md) |
+| Content-Security-Policy deferred | [0109](./decisions/0109-csp-deferred.md) |
+
 ## Future additions
 
 | Topic | ADR |
