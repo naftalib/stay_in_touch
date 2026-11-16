@@ -49,6 +49,11 @@ self.addEventListener("push", (event) => {
     }
   }
   const notice = pushNotice(parsed, self.location.origin);
+  (self as unknown as { __lastPush?: { title: string; body: string; tag: string } }).__lastPush = {
+    title: notice.title,
+    body: notice.body,
+    tag: notice.tag,
+  };
   const nav = self.navigator as {
     setAppBadge?: (count: number) => Promise<void>;
     clearAppBadge?: () => Promise<void>;

@@ -75,7 +75,7 @@ Checklist sections 1–6 and 8–10, from the code and the suites below. Pass un
 6. Secrets. The new migration has no secret. `pnpm push:keys` still writes only gitignored files. Hosted settings now say a rotated key is compared and a device that is off stays off.
 8. Update prompt. `registerType: 'prompt'` unchanged. Later and the other-tab reload are fixed as in the table. The prompt stays `role="status"`.
 9. Install and offline. Permission is still only from a tap. Device-off is the new exception to auto-register. Drafts clear on sign-out and the unmount cannot restore them. Badge is applied in the worker.
-10. Tests. pgTAP plan counts match. Deno covers the partial device failure and per-reason skips. Vitest covers Later, the reload flag, draft suspend, the badge, the key compare, and device-off. Playwright now posts to `push-send` and asserts the notification the worker showed from the captured payload. `getNotifications()` crashes headless Chromium, so the worker posts `PUSH_SHOWN` to the open page. `PushManager` is still stubbed only in that test.
+10. Tests. pgTAP plan counts match. Deno covers the partial device failure and per-reason skips. Vitest covers Later, the reload flag, draft suspend, the badge, the key compare, and device-off. Playwright now posts to `push-send` and reads the notice the worker stored from the captured payload. `getNotifications()` crashes headless Chromium. `PushManager` is still stubbed only in that test.
 
 Concern: container-to-container IPv4 on this VM does not connect, so this agent could not run Playwright or call `push-send` over HTTP. The database, Deno, and Vitest suites did run. CI runs the browser suite.
 
