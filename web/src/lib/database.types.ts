@@ -443,40 +443,88 @@ export type Database = {
       };
       notification_outbox: {
         Row: {
+          actor_member_id: string | null;
+          attempts: number;
           created_at: string;
           email_sent_at: string | null;
+          family_id: string;
           id: string;
+          last_status: number | null;
+          next_attempt_at: string;
           push_sent_at: string | null;
+          recipient_member_id: string;
           recipient_user_id: string;
-          ref_id: string | null;
+          ref_id: string;
+          sent_payload: Json | null;
+          skip_reason: string | null;
           space_id: string | null;
+          status: string;
           type: string;
           updated_at: string;
         };
         ComputedFields: never;
         Insert: {
+          actor_member_id?: string | null;
+          attempts?: number;
           created_at?: string;
           email_sent_at?: string | null;
+          family_id: string;
           id?: string;
+          last_status?: number | null;
+          next_attempt_at?: string;
           push_sent_at?: string | null;
+          recipient_member_id: string;
           recipient_user_id: string;
-          ref_id?: string | null;
+          ref_id: string;
+          sent_payload?: Json | null;
+          skip_reason?: string | null;
           space_id?: string | null;
+          status?: string;
           type: string;
           updated_at?: string;
         };
         Update: {
+          actor_member_id?: string | null;
+          attempts?: number;
           created_at?: string;
           email_sent_at?: string | null;
+          family_id?: string;
           id?: string;
+          last_status?: number | null;
+          next_attempt_at?: string;
           push_sent_at?: string | null;
+          recipient_member_id?: string;
           recipient_user_id?: string;
-          ref_id?: string | null;
+          ref_id?: string;
+          sent_payload?: Json | null;
+          skip_reason?: string | null;
           space_id?: string | null;
+          status?: string;
           type?: string;
           updated_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "notification_outbox_actor_member_id_fkey";
+            columns: ["actor_member_id"];
+            isOneToOne: false;
+            referencedRelation: "family_members";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notification_outbox_family_id_fkey";
+            columns: ["family_id"];
+            isOneToOne: false;
+            referencedRelation: "families";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notification_outbox_recipient_member_id_fkey";
+            columns: ["recipient_member_id"];
+            isOneToOne: false;
+            referencedRelation: "family_members";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "notification_outbox_recipient_user_id_fkey";
             columns: ["recipient_user_id"];
@@ -573,6 +621,7 @@ export type Database = {
           created_at: string;
           disabled_at: string | null;
           endpoint: string;
+          failure_count: number;
           id: string;
           last_used_at: string | null;
           p256dh: string;
@@ -586,6 +635,7 @@ export type Database = {
           created_at?: string;
           disabled_at?: string | null;
           endpoint: string;
+          failure_count?: number;
           id?: string;
           last_used_at?: string | null;
           p256dh: string;
@@ -598,6 +648,7 @@ export type Database = {
           created_at?: string;
           disabled_at?: string | null;
           endpoint?: string;
+          failure_count?: number;
           id?: string;
           last_used_at?: string | null;
           p256dh?: string;
@@ -735,6 +786,20 @@ export type Database = {
         Args: { p_member_id: string; p_role: Database["public"]["Enums"]["family_role"] };
         Returns: undefined;
       };
+      claim_push_batch: {
+        Args: { p_limit: number };
+        Returns: {
+          actor_member_id: string;
+          attempts: number;
+          created_at: string;
+          family_id: string;
+          id: string;
+          recipient_member_id: string;
+          recipient_user_id: string;
+          ref_id: string;
+          space_id: string;
+        }[];
+      };
       create_invitation: {
         Args: {
           p_create_space?: boolean;
@@ -789,6 +854,16 @@ export type Database = {
         Returns: undefined;
       };
       mark_space_read: { Args: { p_space_id: string }; Returns: undefined };
+      my_notification_settings: {
+        Args: { p_family_id: string };
+        Returns: {
+          member_id: string;
+          muted_until: string;
+          push: boolean;
+          space_id: string;
+          space_title: string;
+        }[];
+      };
       my_pending_invitations: {
         Args: Record<PropertyKey, never>;
         Returns: {
@@ -810,6 +885,39 @@ export type Database = {
         Args: { p_body: string; p_media_ids: string[]; p_reply_to_id?: string; p_space_id: string };
         Returns: string;
       };
+      prune_notification_outbox: { Args: Record<PropertyKey, never>; Returns: number };
+      push_group_facts: {
+        Args: { p_ids: string[] };
+        Returns: {
+          actor_label: string;
+          app_badge: number;
+          attempts: number;
+          created_at: string;
+          eligible: boolean;
+          family_id: string;
+          id: string;
+          recipient_member_id: string;
+          recipient_user_id: string;
+          skip_reason: string;
+          space_id: string;
+          space_title: string;
+        }[];
+      };
+      record_push_result: {
+        Args: {
+          p_ids: string[];
+          p_last_status: number;
+          p_retry: boolean;
+          p_sent_payload: Json;
+          p_skip_reason: string;
+          p_status: string;
+        };
+        Returns: undefined;
+      };
+      register_push_subscription: {
+        Args: { p_auth: string; p_endpoint: string; p_p256dh: string; p_user_agent: string };
+        Returns: string;
+      };
       remove_member: { Args: { p_member_id: string }; Returns: undefined };
       rename_space: { Args: { p_space_id: string; p_title: string }; Returns: undefined };
       reserve_photo_upload: {
@@ -829,6 +937,15 @@ export type Database = {
         }[];
       };
       revoke_invitation: { Args: { p_invitation_id: string }; Returns: undefined };
+      set_notifications_enabled: {
+        Args: { p_enabled: boolean; p_family_id: string };
+        Returns: undefined;
+      };
+      set_notifications_paused: {
+        Args: { p_family_id: string; p_until: string };
+        Returns: undefined;
+      };
+      set_space_muted: { Args: { p_muted: boolean; p_space_id: string }; Returns: undefined };
       space_audience: {
         Args: { p_space_id: string };
         Returns: {
@@ -846,6 +963,8 @@ export type Database = {
           unread_count: number;
         }[];
       };
+      unread_total: { Args: { p_user_id: string }; Returns: number };
+      unregister_push_subscription: { Args: { p_endpoint: string }; Returns: undefined };
     };
     Enums: {
       email_preference: "off" | "instant" | "daily";

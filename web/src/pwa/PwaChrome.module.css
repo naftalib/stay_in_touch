@@ -1,0 +1,62 @@
+.stack {
+  position: fixed;
+  z-index: 40;
+  inset-block-start: 5rem;
+  inset-inline-end: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* Leave the Spaces button clear on a phone. */
+  inline-size: min(24rem, calc(100vi - 7rem));
+  pointer-events: none;
+}
+
+.sheet {
+  margin: 0;
+  pointer-events: auto;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sheet p {
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.actions button,
+.linkButton {
+  min-block-size: var(--size-touch-min);
+  padding-inline: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-bg);
+  font-size: var(--text-step-normal);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.actions button:last-child,
+.secondary {
+  background: transparent;
+  color: var(--color-text);
+}
+
+.actions button:focus-visible,
+.linkButton:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: 2px;
+}

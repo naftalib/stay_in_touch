@@ -14,6 +14,7 @@ import { useOnlineStatus } from "./useOnlineStatus.ts";
 import { useRealtimeConnection } from "./useRealtimeConnection.ts";
 import { useRealtimeAuth } from "../realtime/useRealtimeAuth.ts";
 import { PendingInvitesPanel } from "../family/PendingInvitesPanel.tsx";
+import { useAppBadge } from "../pwa/badge.ts";
 import styles from "./AppShell.module.css";
 
 const DRAWER_BREAKPOINT = 900;
@@ -75,6 +76,8 @@ export default function AppShell() {
     () => (unreadQuery.data ?? []).reduce((sum, row) => sum + Number(row.unread_count), 0),
     [unreadQuery.data],
   );
+
+  useAppBadge(totalUnread);
 
   useEffect(() => {
     const base = "Stay In Touch";

@@ -412,6 +412,11 @@ MEDIA_BUCKET = "env(MEDIA_BUCKET)"
 MEDIA_PUBLIC_BASE_URL = "env(MEDIA_PUBLIC_BASE_URL)"
 MEDIA_UPLOAD_MAX_BYTES = "env(MEDIA_UPLOAD_MAX_BYTES)"
 MEDIA_CLEANUP_SECRET = "env(MEDIA_CLEANUP_SECRET)"
+PUSH_TRANSPORT = "env(PUSH_TRANSPORT)"
+PUSH_SEND_SECRET = "env(PUSH_SEND_SECRET)"
+VAPID_PUBLIC_KEY = "env(VAPID_PUBLIC_KEY)"
+VAPID_PRIVATE_KEY = "env(VAPID_PRIVATE_KEY)"
+VAPID_SUBJECT = "env(VAPID_SUBJECT)"
 
 [functions.media-upload-url]
 verify_jwt = true
@@ -423,6 +428,10 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.media-cleanup]
+verify_jwt = false
+
+# Called by pg_net and pg_cron with x-push-send-secret. There is no user JWT.
+[functions.push-send]
 verify_jwt = false
 
 [analytics]

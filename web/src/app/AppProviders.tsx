@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { RouterProvider } from "react-aria-components";
 import { AuthProvider } from "../auth/AuthContext.tsx";
 import { createQueryClient } from "../lib/queryClient.ts";
+import PwaRuntime from "../pwa/PwaRuntime.tsx";
 
 const queryClient = createQueryClient();
 
@@ -27,7 +28,10 @@ export default function AppProviders({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AriaRouter>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <PwaRuntime />
+            {children}
+          </AuthProvider>
         </AriaRouter>
       </BrowserRouter>
       {import.meta.env.DEV ? (

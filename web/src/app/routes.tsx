@@ -11,6 +11,8 @@ import AppShell from '../shell/AppShell.tsx'
 import FamilyHomePage from '../spaces/FamilyHomePage.tsx'
 import SpacePage from '../spaces/SpacePage.tsx'
 import NotFoundPage from './NotFoundPage.tsx'
+import InstallHelpPage from '../pwa/InstallHelpPage.tsx'
+import NotificationSettingsPage from '../pwa/NotificationSettingsPage.tsx'
 
 function InviteTokenScope() {
   const location = useLocation()
@@ -33,6 +35,7 @@ export default function AppRoutes() {
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
         <Route element={<RequireAuth />}>
+          <Route path="/install" element={<InstallHelpPage />} />
           <Route index element={<FamilyPicker />} />
 
           <Route path="/f/:familyId" element={<FamilyGate />}>
@@ -40,6 +43,7 @@ export default function AppRoutes() {
               <Route index element={<FamilyHomePage />} />
               <Route path="members" element={<MembersPage />} />
               <Route path="spaces" element={<SpacesAdminPage />} />
+              <Route path="notifications" element={<NotificationSettingsPage />} />
               <Route path="s/:spaceId/:tab" element={<SpacePage />} />
             </Route>
           </Route>

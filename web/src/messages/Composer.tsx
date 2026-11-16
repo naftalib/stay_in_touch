@@ -18,14 +18,27 @@ import {
   tooManyPhotos,
   type PhotoDraft,
 } from "../media/photoDraft.ts";
+import { setComposeActive } from "../pwa/composeActivity.ts";
+import {
+  clearDraft,
+  draftStorageKey,
+  readDraft,
+  registerDraftFlush,
+  writeDraft,
+} from "../pwa/drafts.ts";
+import { PHOTOS_IN_PROGRESS_KEY } from "../pwa/pushClient.ts";
 import { finishUpload, putBlob, reserveUpload } from "../media/upload.ts";
 import type { ThreadMessage } from "./types.ts";
 import styles from "./Composer.module.css";
 
 const MAX_LENGTH = 4000;
 
+const OFFLINE_SEND =
+  "You're offline. Your message is saved and you can send it when you're back online.";
+
 type ComposerProps = {
   spaceId?: string;
+  userId?: string;
   disabled?: boolean;
   disabledReason?: string;
   offline?: boolean;
@@ -37,6 +50,7 @@ type ComposerProps = {
 
 export default function Composer({
   spaceId,
+  userId,
   disabled,
   disabledReason,
   offline,
@@ -45,15 +59,22 @@ export default function Composer({
   onSend,
   onSendPhotos,
 }: ComposerProps) {
-  const [body, setBody] = useState("");
+  const draftKey = userId && spaceId ? draftStorageKey(userId, spaceId) : null;
+  const [body, setBody] = useState(() => (draftKey ? readDraft(draftKey) : ""));
   const [photos, setPhotos] = useState<PhotoDraft[]>([]);
+  const [photoNotice] = useState(() => {
+    try {
+      return sessionStorage.getItem(PHOTOS_IN_PROGRESS_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<AppError | null>(null);
   const [leaveTo, setLeaveTo] = useState<string | null>(null);
   const filesRef = useRef(new Map<string, File>());
   const cancelledRef = useRef(new Set<string>());
   const abortRef = useRef(new Map<string, AbortController>());
-  const effectiveDisabled = disabled || offline;
   const gate = sendGate(body, photos);
   const busy = photos.some((photo) => photo.phase === "preparing" || photo.phase === "uploading");
 
@@ -61,6 +82,43 @@ export default function Composer({
     if (!replyTo) return;
     document.querySelector<HTMLTextAreaElement>("[data-composer-input]")?.focus();
   }, [replyTo]);
+
+  useEffect(() => {
+    if (!draftKey) return;
+    const timer = window.setTimeout(() => writeDraft(draftKey, body), 400);
+    return () => window.clearTimeout(timer);
+  }, [body, draftKey]);
+
+  useEffect(() => {
+    if (!draftKey) return;
+    return registerDraftFlush(() => writeDraft(draftKey, body));
+  }, [body, draftKey]);
+
+  useEffect(() => {
+    setComposeActive(body.trim().length > 0 || photos.length > 0);
+    return () => setComposeActive(false);
+  }, [body, photos.length]);
+
+  useEffect(() => {
+    const inProgress = photos.some(
+      (photo) => photo.phase === "preparing" || photo.phase === "uploading",
+    );
+    try {
+      if (inProgress) sessionStorage.setItem(PHOTOS_IN_PROGRESS_KEY, "1");
+      else if (!photoNotice) sessionStorage.removeItem(PHOTOS_IN_PROGRESS_KEY);
+    } catch {
+      // ignore
+    }
+  }, [photoNotice, photos]);
+
+  useEffect(() => {
+    if (!photoNotice) return;
+    try {
+      sessionStorage.removeItem(PHOTOS_IN_PROGRESS_KEY);
+    } catch {
+      // ignore
+    }
+  }, [photoNotice]);
 
   useEffect(() => {
     if (!busy) return;
@@ -182,7 +240,7 @@ export default function Composer({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (effectiveDisabled || !gate.enabled) return;
+    if (disabled || offline || !gate.enabled) return;
     const trimmed = body.trim();
     const ready = photos.filter((photo) => photo.phase === "ready" && photo.mediaId);
     setSubmitting(true);
@@ -204,6 +262,7 @@ export default function Composer({
       } else {
         await onSend(trimmed, replyTo?.id ?? null);
       }
+      if (draftKey) clearDraft(draftKey);
       setBody("");
       onCancelReply?.();
     } catch (caught) {
@@ -213,13 +272,11 @@ export default function Composer({
     }
   }
 
-  if (effectiveDisabled) {
+  if (disabled) {
     return (
       <footer className={styles.footer}>
         <p className={styles.disabled} role="status">
-          {offline
-            ? "You're offline. Sending is disabled until you're back online."
-            : (disabledReason ?? "This space is read-only.")}
+          {disabledReason ?? "This space is read-only."}
         </p>
       </footer>
     );
@@ -328,6 +385,14 @@ export default function Composer({
             {MAX_LENGTH - body.length} characters left
           </p>
         ) : null}
+        {photoNotice ? (
+          <p role="status">Photos from your last visit were not saved. Add them again.</p>
+        ) : null}
+        {offline ? (
+          <p className={styles.counter} id="offline-send-reason" role="status">
+            {OFFLINE_SEND}
+          </p>
+        ) : null}
         {gate.reason ? (
           <p className={styles.counter} id="photo-send-reason" role="status">
             {gate.reason}
@@ -336,8 +401,12 @@ export default function Composer({
         <Button
           type="submit"
           className={styles.button}
-          isDisabled={submitting || !gate.enabled}
-          aria-describedby={gate.reason ? "photo-send-reason" : undefined}
+          isDisabled={submitting || !gate.enabled || Boolean(offline)}
+          aria-describedby={
+            [offline ? "offline-send-reason" : null, gate.reason ? "photo-send-reason" : null]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
         >
           Send
         </Button>

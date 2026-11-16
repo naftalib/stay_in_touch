@@ -123,19 +123,28 @@ test("two messages with the same timestamp both appear once", async ({ page }) =
   const scroller = page.locator("[data-thread-scroller]");
   await expect(scroller).toBeVisible();
   await expect(page.getByText("Welcome to the family.", { exact: true })).toBeVisible();
-  for (let i = 0; i < 12; i += 1) {
-    if ((await scroller.innerText()).includes("Beginning of the thread")) break;
-    await expect(scroller.getByRole("button", { name: "Load older messages" })).toBeAttached();
-    // The button sits above the scrolled-to-end thread. A real click waits to
-    // scroll it into view, and the list snaps back to the bottom.
-    await scroller.evaluate((node) => {
-      const button = [...node.querySelectorAll("button")].find((item) =>
-        item.textContent?.includes("Load older messages"),
-      );
-      if (button instanceof HTMLButtonElement) button.click();
-    });
-    await expect(scroller.getByRole("button", { name: "Loading older messages…" })).toHaveCount(0);
-  }
+  // A short screen can sit at scrollTop 0 and load every page by itself.
+  // textContent still sees the start line when it is scrolled out of view.
+  // The button sits above the scrolled-to-end thread. A real click waits to
+  // scroll it into view, and the list snaps back to the bottom.
+  await expect
+    .poll(async () => {
+      return scroller.evaluate((node) => {
+        if ((node.textContent ?? "").includes("Beginning of the thread")) return "start";
+        const button = [...node.querySelectorAll("button")].find(
+          (item) =>
+            item.textContent?.includes("Load older messages") &&
+            item instanceof HTMLButtonElement &&
+            !item.disabled,
+        );
+        if (button instanceof HTMLButtonElement) {
+          button.click();
+          return "clicked";
+        }
+        return "pending";
+      });
+    })
+    .toBe("start");
   await expect(scroller.getByText("Beginning of the thread")).toBeVisible();
   await expect(scroller.getByText("tie-alpha", { exact: true })).toHaveCount(1);
   await expect(scroller.getByText("tie-beta", { exact: true })).toHaveCount(1);
@@ -167,7 +176,12 @@ test("offline keeps loaded messages and disables sending", async ({ page }) => {
       "You're offline. You can read messages you've already loaded. New messages will appear when you're back online.",
     ),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Send" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Send" })).toBeDisabled();
+  await expect(
+    page.getByText(
+      "You're offline. Your message is saved and you can send it when you're back online.",
+    ),
+  ).toBeVisible();
   await expect(page.getByText("Welcome to the family.", { exact: true })).toBeVisible();
 
   const body = `While mom was offline ${Date.now()}`;

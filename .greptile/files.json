@@ -1,0 +1,144 @@
+{
+  "files": [
+    {
+      "path": "docs/architecture.md",
+      "description": "System architecture and data flow."
+    },
+    {
+      "path": "docs/decisions.md",
+      "description": "Index of accepted ADRs; individual ADRs are in docs/decisions/."
+    },
+    {
+      "path": "docs/decisions/0024-media-object-key-shape.md",
+      "description": "Object keys, never URLs."
+    },
+    {
+      "path": "docs/decisions/0027-membership-changes-via-rpc-audit.md",
+      "description": "Access changes go through security-definer RPCs."
+    },
+    {
+      "path": "docs/decisions/0069-realtime-ids-only.md",
+      "description": "Realtime payloads are ids only."
+    },
+    {
+      "path": "docs/decisions/0073-orphan-schedule-when-configured.md",
+      "description": "Schedule a cron job only when Vault holds the secret and URL."
+    },
+    {
+      "path": "docs/decisions/0077-inject-manifest.md",
+      "description": "Service worker via vite-plugin-pwa injectManifest."
+    },
+    {
+      "path": "docs/decisions/0078-cache-app-shell-only.md",
+      "description": "Precache the app shell. Never cache Supabase APIs."
+    },
+    {
+      "path": "docs/decisions/0079-update-prompt.md",
+      "description": "Ask before updating. Hold the prompt while composing."
+    },
+    {
+      "path": "docs/decisions/0080-install-and-ios-help.md",
+      "description": "Install card and the iPhone Home Screen steps."
+    },
+    {
+      "path": "docs/decisions/0081-push-sender-boundary.md",
+      "description": "PushSender wraps @negrel/webpush."
+    },
+    {
+      "path": "docs/decisions/0082-who-and-where-payload.md",
+      "description": "Push body is the author label and the space title."
+    },
+    {
+      "path": "docs/decisions/0083-who-is-notified.md",
+      "description": "Viewers except the author. Quiet hours were not chosen."
+    },
+    {
+      "path": "docs/decisions/0084-outbox-trigger-and-sweep.md",
+      "description": "Enqueue on insert. Sweep every minute when Vault is set."
+    },
+    {
+      "path": "docs/decisions/0085-notification-tag-per-space.md",
+      "description": "One notification tag per space."
+    },
+    {
+      "path": "docs/decisions/0086-permission-on-tap.md",
+      "description": "The browser permission prompt runs only from Turn on."
+    },
+    {
+      "path": "docs/decisions/0087-offline-draft-no-queue.md",
+      "description": "Save the draft. Do not send while offline."
+    },
+    {
+      "path": "docs/decisions/0088-app-badge.md",
+      "description": "The icon badge is the unread total."
+    },
+    {
+      "path": "docs/decisions/0089-real-iphone-deferred.md",
+      "description": "A real iPhone push check waits for the hosted project."
+    },
+    {
+      "path": "docs/decisions/0090-greptile-config.md",
+      "description": "Greptile reviews when a pull request opens."
+    },
+    {
+      "path": "docs/decisions/0091-subscription-ownership-move.md",
+      "description": "A shared browser endpoint follows the signed-in person."
+    },
+    {
+      "path": "docs/decisions/0092-outbox-retention.md",
+      "description": "Finished outbox rows are kept for seven days."
+    },
+    {
+      "path": "docs/decisions/0093-pwa-icons.md",
+      "description": "Icons generated from one SVG. No iOS splash set."
+    },
+    {
+      "path": "docs/hosted-settings.md",
+      "description": "Hosted VAPID, Vault, and Cloudflare cache notes."
+    },
+    {
+      "path": "docs/build-log/06-pwa-push.md",
+      "description": "Handoff 06 build journal."
+    },
+    {
+      "path": "supabase/migrations/20261116120000_push.sql",
+      "description": "Push outbox, subscription RPCs, enqueue trigger, and the one-minute sweep."
+    },
+    {
+      "path": "supabase/functions/push-send/index.ts",
+      "description": "push-send Edge Function entry. Secret header, no user JWT."
+    },
+    {
+      "path": "supabase/functions/push-send/handler.ts",
+      "description": "Groups outbox rows and sends a who-and-where payload."
+    },
+    {
+      "path": "supabase/functions/_shared/push/payload.ts",
+      "description": "Notification copy. Who and where only."
+    },
+    {
+      "path": "supabase/functions/_shared/push/webpush.ts",
+      "description": "Web Push transport using @negrel/webpush."
+    },
+    {
+      "path": "web/src/sw.ts",
+      "description": "Service worker. Precache the app shell and show notifications."
+    },
+    {
+      "path": "web/vite.config.ts",
+      "description": "Vite PWA injectManifest setup and preview cache headers."
+    },
+    {
+      "path": "web/src/pwa/UpdatePrompt.tsx",
+      "description": "Update prompt. Never reloads while a message or photo is in progress."
+    },
+    {
+      "path": "web/src/pwa/NotificationSettingsPage.tsx",
+      "description": "Per-device, per-space, and pause controls."
+    },
+    {
+      "path": "scripts/push-keys.ts",
+      "description": "Generates a VAPID pair into gitignored env files."
+    }
+  ]
+}

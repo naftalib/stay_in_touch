@@ -9,6 +9,17 @@ describe('Composer', () => {
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
   })
 
+  it('keeps the composer while offline and explains that the draft is saved', () => {
+    render(<Composer onSend={vi.fn()} offline userId="mom" spaceId="general" />)
+    expect(
+      screen.getByText(
+        "You're offline. Your message is saved and you can send it when you're back online.",
+      ),
+    ).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+    expect(screen.getByPlaceholderText('Write a message…')).toBeVisible()
+  })
+
   it('sends with ctrl+enter', async () => {
     const user = userEvent.setup()
     const onSend = vi.fn().mockResolvedValue(undefined)

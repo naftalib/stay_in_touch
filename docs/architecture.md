@@ -2,12 +2,13 @@
 
 ## Overview
 
-Stay In Touch is a private, invite-only family social app: one family per tenant, spaces for General, each parent, and each child, with grandparents able to visit every space. The repo has the database, signed-in screens, invite email, admin tools, and photo upload (handoff 05). Notification digests, push, and video remain planned.
+Stay In Touch is a private, invite-only family social app: one family per tenant, spaces for General, each parent, and each child, with grandparents able to visit every space. The repo has the database, signed-in screens, invite email, admin tools, photo upload (handoff 05), and an installable app with web push (handoff 06). Video remains planned. Email notification digests are not built; the `email` preference column stays for later.
 
 ```mermaid
 flowchart LR
-  subgraph client["Client (planned PWA)"]
+  subgraph client["Client (PWA)"]
     Web["Vite + React + TS<br/>React Aria, CSS Modules"]
+    SW["Service worker<br/>shell cache + push"]
   end
   subgraph cf["Cloudflare (planned)"]
     Pages["Static / PWA host"]
@@ -18,10 +19,10 @@ flowchart LR
     PG["Postgres + RLS"]
     ST["Storage<br/>private photos bucket"]
     RT["Realtime Broadcast<br/>ids only"]
-    EF["Edge Functions<br/>invite-send + media"]
+    EF["Edge Functions<br/>invite-send, media, push-send"]
   end
-  subgraph notify["Notifications (planned)"]
-    Resend["Resend SMTP"]
+  subgraph notify["Notifications"]
+    Resend["Resend SMTP<br/>(email, later)"]
     Push["Web Push / VAPID"]
   end
   subgraph future["Future"]
@@ -37,15 +38,17 @@ flowchart LR
   EF --> PG
   EF -.-> Auth
   Auth -.-> Resend
-  Web -.-> Push
+  Web --> SW
+  EF --> Push
+  SW --> Web
   API -.-> PG
 ```
 
 | Folder | Responsibility | Status |
 |---|---|---|
-| `web/` | PWA UI, Supabase client, accessibility-first components | **Auth, shell, threads, photos, invite, admin** |
+| `web/` | PWA UI, service worker, Supabase client, accessibility-first components | **Auth, shell, threads, photos, invite, admin, install, push settings** |
 | `supabase/` | Migrations, seed, pgTAP tests, local CLI config | **Implemented** |
-| `supabase/functions/` | `invite-send`, media upload/finish/view/cleanup | **Implemented** |
+| `supabase/functions/` | `invite-send`, media upload/finish/view/cleanup, `push-send` | **Implemented** |
 | `api/` | Later AI / Python services | README only |
 | `docs/` | Architecture, ADRs, build log, hosted checklist | Living docs |
 | `.github/workflows/` | Web unit tests, E2E vs local Supabase, database CI | **Implemented** |
@@ -63,6 +66,7 @@ For roles, tables, RLS, RPCs, and Realtime behavior, see the sections below. Pla
 | `spaces/` | Space page, Members/Spaces admin, unavailable screen, audience line |
 | `messages/` | Thread, composer, cache merge, realtime refetch by id |
 | `media/` | Resize, HEIC fallback, upload, Pics tab, viewer |
+| `pwa/` | Service-worker registration, install and permission cards, notification settings, drafts, badge |
 | `settings/` | Text size control (`data-text-size` on `<html>`) |
 | `ui/` | Thin React Aria wrappers |
 | `lib/` | Typed Supabase singleton, TanStack Query client, query keys, errors |
@@ -77,10 +81,10 @@ Stay In Touch is a private, invite-only family app. One family has a General spa
 
 ## Stack
 
-- Frontend: Vite, React, TypeScript (`strict`), React Aria Components, CSS Modules. No Tailwind. The app will become a PWA and move to Cloudflare later.
+- Frontend: Vite, React, TypeScript (`strict`), React Aria Components, CSS Modules. No Tailwind. The production build is a PWA (ADR 0077). Hosting on Cloudflare is still later.
 - Backend: Supabase. Postgres with row-level security, Auth, Realtime Broadcast, Storage, and Edge Functions.
 - Media: private Supabase Storage bucket `photos` for the prototype (ADR 0061). The database stores object keys, never URLs. R2 and B2 are provider modules, not wired to a bucket yet.
-- Email and push later: Resend as Auth SMTP, Web Push via VAPID.
+- Email later: Resend as Auth SMTP. Web Push is VAPID through `push-send` (ADR 0081).
 - A FastAPI service on Cloud Run is reserved under `api/` and is not built.
 
 ## Roles
@@ -109,9 +113,9 @@ UUID primary keys. `created_at` and `updated_at` on every table (`updated_at` is
 | `media` | Key `f/{family_id}/s/{space_id}/{media_id}/original.jpg` and `thumb.jpg`. `provider` is `supabase`, `r2`, `b2`, or `mux`. |
 | `invitations` | Admin-created. Pending, accepted, revoked, or expired. |
 | `space_reads` | `(member_id, space_id)` and `last_read_at`. |
-| `push_subscriptions` | One device row, visible only to that user. |
-| `notification_prefs` | Per member, optionally per space. |
-| `notification_outbox` | Server only. No client grants. |
+| `push_subscriptions` | One row per endpoint. Visible only to that user. Registering an existing endpoint moves it to the signed-in person. |
+| `notification_prefs` | Per member, and optionally per space. `push` and `muted_until`. No client delete. |
+| `notification_outbox` | Server only. One row per recipient and new post. No client grants. |
 | `audit_log` | Admins can read. Only security-definer RPCs write. |
 
 ## Enforcement
@@ -199,6 +203,38 @@ sequenceDiagram
 ```
 
 `media-cleanup` runs with `x-media-cleanup-secret` and deletes orphan objects older than 24 hours, including soft-deleted uploads that were never attached to a message. Attached photos stay so an admin can restore them. The Video tab is hidden. `/video` redirects to messages.
+
+## Install, offline, and push (handoff 06)
+
+The production build registers `web/src/sw.ts` (Workbox `injectManifest`). `pnpm dev` does not. The worker precaches the app shell only: HTML, JS, CSS, fonts, and icons. It does not precache the lazy `heic-to` chunk and it does not cache Supabase REST, RPC, Auth, Realtime, Functions, or Storage. A navigation falls back to `index.html` except `/auth/`, `/functions/`, `/rest/`, and `/storage/`. Preview sends `Cache-Control: no-cache` for `sw.js` and `index.html`. A waiting worker shows "A new version of Stay In Touch is ready" and does not reload while the composer has text or a photo upload is in progress.
+
+Offline, the connection banner stays and the composer stays. Send is disabled. The draft text is in `localStorage` for that person and space, and it is cleared on send and on sign-out. Photos are not kept across a reload.
+
+`/f/:familyId/notifications` is linked next to text size. It can turn this device on or off, turn all notifications off, pause for 8 hours or until 07:00 Asia/Jerusalem, and mute one visible space. Pause and the all-off switch take `p_family_id` because one person can belong to more than one family (ADR 0015).
+
+```mermaid
+sequenceDiagram
+  participant Browser
+  participant PG as Postgres
+  participant EF as push-send
+  participant Push as Push service
+  participant SW as Service worker
+  Browser->>PG: insert message
+  PG->>PG: enqueue viewers<br/>except author, muted, paused
+  PG->>EF: pg_net POST<br/>when Vault secrets exist
+  EF->>PG: claim and re-check prefs
+  EF->>Push: who and where only<br/>Declarative Web Push JSON
+  Push->>SW: push event
+  SW->>Browser: notification<br/>tag space id
+  Browser->>SW: click
+  SW->>Browser: open the thread
+```
+
+A one-minute `pg_cron` sweep retries rows the immediate call missed, and deletes sent, skipped, and failed rows older than 7 days. Both the trigger's HTTP call and the sweep run only when Vault holds `push_send_secret` and `push_send_url`. The sender is `PushSender`: `webpush` (`@negrel/webpush`) or `capture`. A 404 or 410 deletes the subscription. 429 and 5xx back off 1, 5, then 15 minutes and stop after 4 attempts. 400 and 413 are failed. No remaining device is `skipped` / `no_device`.
+
+The push module is `supabase/functions/_shared/push/`. Client RPCs, granted to `authenticated`: `register_push_subscription`, `unregister_push_subscription`, `set_space_muted`, `set_notifications_enabled`, `set_notifications_paused`, `my_notification_settings`. Service RPCs, granted to `service_role`: `claim_push_batch`, `push_group_facts`, `record_push_result`, `prune_notification_outbox`, `unread_total`.
+
+While the app is open, `setAppBadge` uses that family's unread total and clears at zero. The push payload's `app_badge` is `private.unread_total` across families.
 
 ## Media flow (later)
 

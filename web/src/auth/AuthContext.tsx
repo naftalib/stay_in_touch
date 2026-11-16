@@ -11,6 +11,8 @@ import { useNavigate } from "react-router";
 import type { Session, User } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
 import { getSupabase } from "../lib/supabase.ts";
+import { clearAllDrafts } from "../pwa/drafts.ts";
+import { releasePushSubscription } from "../pwa/pushClient.ts";
 export type AuthStatus = "loading" | "signedIn" | "signedOut";
 
 type AuthContextValue = {
@@ -84,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setStatus("signedOut");
       if (event === "SIGNED_OUT") {
+        clearAllDrafts();
         window.setTimeout(() => {
           void clearClientState().then(() => {
             navigate(pathAfterSignOut(), {
@@ -115,6 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     sessionStorage.setItem("stay-signed-out", "1");
+    await releasePushSubscription().catch(() => undefined);
+    clearAllDrafts();
     await clearClientState();
     await getSupabase().auth.signOut();
   }, [clearClientState]);

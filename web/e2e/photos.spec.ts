@@ -175,13 +175,13 @@ test("pics shows 30 photos then the rest, and the viewer moves and closes", asyn
   const space = SPACES.ari;
   for (let index = 0; index < 35; index += 1) {
     const id = `c5000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
-    const when = `2026-11-15 12:00:${String(index).padStart(2, "0")}+00`;
+    const when = `now() - interval '${35 - index} seconds'`;
     psql(
       `insert into public.media (id, space_id, family_id, uploader_member_id, kind, r2_key, thumb_key, content_type, status, provider, caption, created_by, created_at, width, height)
        values ('${id}', '${space}', '${family}', '${GRANDMA}', 'photo',
          'f/${family}/s/${space}/${id}/original.jpg',
          'f/${family}/s/${space}/${id}/thumb.jpg',
-         'image/jpeg', 'ready', 'supabase', 'grid-${index}', '${GRANDMA_USER}', '${when}', 80, 80)`,
+         'image/jpeg', 'ready', 'supabase', 'grid-${index}', '${GRANDMA_USER}', ${when}, 80, 80)`,
     );
   }
   await signInWithPassword(page, SEED_USERS.grandma);
@@ -423,15 +423,43 @@ test("a failed upload can be retried", async ({ page }) => {
   const file = await rasterFile(page, "retry.jpg", 40, 40, "image/jpeg");
   await signInWithPassword(page, SEED_USERS.mom);
   await page.goto(`/f/${FAMILY_ID}/s/${SPACES.general}/messages`);
-  let failed = 0;
-  await page.route("**/storage/v1/object/upload/**", (route) => {
-    failed += 1;
-    if (failed === 1) return route.abort();
-    return route.continue();
+  // WebKit does not hand a service-worker-controlled upload to page.route.
+  // The uploader uses XMLHttpRequest. Fail the first one inside the page,
+  // after the worker is controlling, by calling the error handler it sets.
+  await page.evaluate(async () => {
+    if ("serviceWorker" in navigator) {
+      await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((resolve) => setTimeout(resolve, 3_000)),
+      ]);
+    }
+    const Original = window.XMLHttpRequest;
+    let failedOnce = false;
+    const Wrapped = function WrappedXhr(this: XMLHttpRequest) {
+      const xhr = new Original();
+      let target = "";
+      const open = xhr.open.bind(xhr);
+      xhr.open = (method: string, url: string | URL, async?: boolean, username?: string | null, password?: string | null) => {
+        target = String(url);
+        return open(method, url, async ?? true, username, password);
+      };
+      const send = xhr.send.bind(xhr);
+      xhr.send = (body?: Document | XMLHttpRequestBodyInit | null) => {
+        if (!failedOnce && target.includes("/object/upload/")) {
+          failedOnce = true;
+          queueMicrotask(() => {
+            xhr.onerror?.(new ProgressEvent("error"));
+          });
+          return;
+        }
+        return send(body);
+      };
+      return xhr;
+    };
+    window.XMLHttpRequest = Wrapped as unknown as typeof XMLHttpRequest;
   });
   await page.locator('input[type="file"]').setInputFiles(file);
   await expect(page.getByRole("button", { name: "Retry" })).toBeVisible({ timeout: 20_000 });
-  await page.unroute("**/storage/v1/object/upload/**");
   await page.getByRole("button", { name: "Retry" }).click();
   await expect(page.getByRole("button", { name: "Send" })).toBeEnabled({ timeout: 30_000 });
 });
