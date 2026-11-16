@@ -31,13 +31,19 @@ This machine has Google Chrome 157.0.8103.50, xvfb, and outbound internet. Docke
 
 ## Runs
 
-The green `workflow_dispatch` run (after the temporary push trigger is removed) is filled in below once it finishes.
-
-Bootstrap, from GitHub's rule checked on 16 Nov 2026: `workflow_dispatch` only lists a workflow file that has already run, and a new file is not on the default branch. The first commit on this branch adds `push: branches: ['cursor/push-smoke-*']` so that push registers the workflow. That block is removed before the run that counts. A later `gh workflow run push-smoke.yml --ref cursor/push-smoke-dcd3` is that run.
+Bootstrap, from GitHub's rule checked on 16 Nov 2026: `workflow_dispatch` only lists a workflow file that has already run, and a new file is not on the default branch. The first commits on this branch added `push: branches: ['cursor/push-smoke-*']` so that push registered the workflow. That block is removed in the commit that follows the flag check. The run that counts is a later `gh workflow run push-smoke.yml --ref cursor/push-smoke-dcd3`, linked under Dispatch.
 
 First bootstrap run, temporary trigger still present: https://github.com/naftalib/stay_in_touch/actions/runs/43944967060 — failed in 1m 31s at "Point the trigger at push-send". `PUSH_TRANSPORT=webpush`, `pg_net` created, Kong alias `kong` on `supabase_network_stay-in-touch`. `vault.create_secret(text,text,text)` was null. Chrome did not start.
 
-Second bootstrap run: https://github.com/naftalib/stay_in_touch/actions/runs/43945834319 — failed in 2m 17s inside the Playwright test, before Chrome. The trigger step passed. `supabase_vault` was already installed (`extension "supabase_vault" already exists`). The printed identity is `vault.create_secret(new_secret text, new_name text, new_description text, new_key_id uuid)`. Vault host `kong:8000`. Preflight `200 {"claimed":0,"sent":0,"skipped":0,"failed":0,"retried":0}`. Google Chrome 157.0.8103.78, Playwright 1.65.0. Playwright rejected the test callback because the first argument was not an object destructuring pattern. The next commit destructures `browserName` and does not use it.
+Second bootstrap run: https://github.com/naftalib/stay_in_touch/actions/runs/43945834319 — failed in 2m 17s inside Playwright, before Chrome. The trigger step passed. `supabase_vault` was already installed (`extension "supabase_vault" already exists`). The printed identity is `vault.create_secret(new_secret text, new_name text, new_description text, new_key_id uuid)`. Vault host `kong:8000`. Preflight `200 {"claimed":0,"sent":0,"skipped":0,"failed":0,"retried":0}`. Google Chrome 157.0.8103.78, Playwright 1.65.0. Playwright rejected the test callback because the first argument was not an object destructuring pattern.
+
+Third bootstrap run, flag removed, temporary trigger still present: https://github.com/naftalib/stay_in_touch/actions/runs/43946489400 — success in 1m 57s. `background_networking=enabled`, `saved=turn-on` (the reload was not needed), `subscribe_ms=3098`, `browser_ms=3053`, endpoint host `fcm.googleapis.com`, `delivery_ms=1378`, `fcm=2xx (library)`, `vault_host=kong:8000`, `trigger=pg_net`, `notifications=match`. Chrome 157.0.8103.78, Playwright 1.65.0. Two tests passed in 8.1s. The marker did not appear in the log.
+
+Flag check, temporary trigger still present, `PUSH_SMOKE_KEEP_BACKGROUND_NETWORKING=1`: https://github.com/naftalib/stay_in_touch/actions/runs/43947313905 — success in 2m 30s. `background_networking=playwright-default-disabled`, `saved=turn-on`, `subscribe_ms=1127`, `browser_ms=1072`, endpoint host `fcm.googleapis.com`, `delivery_ms=1477`, `fcm=2xx (library)`, `notifications=match`. On this runner, with Chrome 157, leaving Playwright's default switch on still registered and decrypted. The shipped workflow removes the switch anyway (ADR 0096). That env var is not in the final file.
+
+### Dispatch
+
+Filled in after `gh workflow run` on the commit that no longer has the `push` trigger.
 
 ## Review findings and how each was resolved
 
@@ -56,7 +62,7 @@ Not yet. Greptile reviews when the pull request opens (`autoReview` stays `["ope
 - `enablePushFromTap` gives `PushManager.subscribe` 8 seconds (`settled` in `pushClient.ts`). A first FCM registration can take longer. The test does not change that helper. If the browser has an FCM endpoint and the database row is still missing, it reloads once so `ensurePushRegistered` stores the subscription the click already created. Whether that reload was needed is recorded with the run.
 - `pg_net` is created in the job when `net.http_post` is missing. `supabase_vault` was already present after `db reset` (`extension "supabase_vault" already exists`). The migration reads Vault only when `vault.decrypted_secrets` exists. No migration or function code changed. `vault.create_secret` is found by name in the `vault` schema. The three-argument `to_regprocedure` check the pgTAP file uses returned null on the runner, because the identity is `(new_secret text, new_name text, new_description text, new_key_id uuid)`. The call still passes three arguments and lets the fourth default.
 - The workflow's preflight calls `net.http_post` once, before the test, against an empty (or already settled) outbox. That only checks that Kong answers. The smoke message is posted later, through the composer, and the trigger is what sends it.
-- A temporary `push` trigger exists only on the bootstrap commit. It is not in the final workflow file.
+- A temporary `push` trigger registered the workflow. It is removed in the commit that records the flag check. It is not in the final workflow file.
 
 ## Open questions and decisions made
 

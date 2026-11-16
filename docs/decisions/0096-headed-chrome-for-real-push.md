@@ -12,7 +12,7 @@ Headless Chromium cannot complete a real push registration. Playwright's `browse
 The smoke test launches headed Google Chrome (`channel: "chrome"`, `headless: false`) in a new temporary profile, under `xvfb-run -a` on Linux. Notification permission is granted for `http://127.0.0.1:5173` after the Turn on card is on screen, and the test clicks Turn on. `subscribe` may take up to 90 seconds. Delivery may take up to 120 seconds. The test allows one retry. It does not stub `PushManager`, `Notification`, or `subscribe`.
 
 ## Consequences
-The job needs a display. macOS and Windows can run it without `xvfb`. The first registration in a fresh profile is the slow part. `--disable-background-networking` is removed; whether a run with Playwright's default switch still registers is recorded in the build log. A profile that cannot obtain an `https://fcm.googleapis.com/` endpoint fails the job. There is no stub, no local mock presented as FCM, and no `continue-on-error`.
+The job needs a display. macOS and Windows can run it without `xvfb`. The first registration in a fresh profile is the slow part. `--disable-background-networking` is removed. On the 16 Nov 2026 GitHub-hosted runner (Chrome 157.0.8103.78) a second run that left Playwright's default switch on still obtained an `https://fcm.googleapis.com/` endpoint and decrypted the payload. The shipped config removes the switch anyway. A profile that cannot obtain an `https://fcm.googleapis.com/` endpoint fails the job. There is no stub, no local mock presented as FCM, and no `continue-on-error`.
 
 ## Status
 Accepted

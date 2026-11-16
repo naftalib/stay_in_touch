@@ -6,12 +6,6 @@ name: Push smoke test
 
 on:
   workflow_dispatch:
-  # TEMPORARY bootstrap. Delete this push block after the first run.
-  # workflow_dispatch can target a branch only after this file has run once,
-  # and a brand-new workflow file is not on the default branch yet.
-  push:
-    branches:
-      - "cursor/push-smoke-*"
   # Weekly schedule. Delete this block to keep the workflow dispatch-only.
   # Schedules run only on the default branch.
   # GitHub disables a scheduled workflow after 60 days without repository activity.
@@ -169,8 +163,6 @@ jobs:
           CI: "true"
           PUSH_SMOKE_PUSH_URL: http://kong:8000/functions/v1/push-send
           PUSH_SEND_SECRET: local-push-dev
-          # One-time check of Playwright's default flag. Remove with the bootstrap push trigger.
-          PUSH_SMOKE_KEEP_BACKGROUND_NETWORKING: "1"
           VAPID_PRIVATE_KEY: ""
           VAPID_PUBLIC_KEY: ""
         run: xvfb-run -a pnpm test:push:real
