@@ -43,7 +43,15 @@ Flag check, temporary trigger still present, `PUSH_SMOKE_KEEP_BACKGROUND_NETWORK
 
 ### Dispatch
 
-Filled in after `gh workflow run` on the commit that no longer has the `push` trigger.
+The removal commit (`c502f34`) has no `push` trigger. Pushing it did not start a run. The newest run after that push was still the flag check above.
+
+`gh workflow run push-smoke.yml --ref cursor/push-smoke-dcd3` failed:
+
+`could not create workflow dispatch event: HTTP 403: Resource not accessible by integration (https://api.github.com/repos/naftalib/stay_in_touch/actions/workflows/420544864/dispatches)`
+
+The same call as `POST /repos/naftalib/stay_in_touch/actions/workflows/push-smoke.yml/dispatches` with `{"ref":"cursor/push-smoke-dcd3"}` returned `{"message":"Resource not accessible by integration","status":"403"}`. The token is a GitHub App installation token (`ghs_`). It can push the branch. It cannot create a workflow dispatch. No run was faked, and the `push` trigger was not put back.
+
+The green run of the shipped test (flag removed, headed Chrome, real FCM, decrypted payload) is https://github.com/naftalib/stay_in_touch/actions/runs/43946489400. That run still had the temporary `push` trigger in the workflow file. The job steps and the spec are the same as the final file. Naftali can start `workflow_dispatch` from the Actions tab on this branch; this agent could not.
 
 ## Review findings and how each was resolved
 
@@ -96,4 +104,4 @@ From build log 06:
 - Email notifications are not built. The `email` column remains.
 - `@negrel/webpush` has no formal crypto audit.
 
-Real push smoke test: done in this handoff (ADR 0095), pending the green dispatched run recorded above. If Chrome on the runner cannot get an FCM endpoint, this line will say so and the workflow stays in the repo for a later try.
+Real push smoke test: the test passed on the GitHub-hosted runner (https://github.com/naftalib/stay_in_touch/actions/runs/43946489400, Chrome 157.0.8103.78, FCM, decrypted who-and-where payload, job 1m 57s). A `workflow_dispatch` after the temporary push trigger was removed returned HTTP 403 from this agent's token, so that later dispatch does not exist. The workflow file is in the repo for Naftali to run from the Actions tab.
