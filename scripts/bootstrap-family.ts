@@ -1,6 +1,7 @@
 /**
  * Create the first family and send the admin invite.
- * Run on Naftali's computer. Refuses GitHub Actions and a git-tracked env file.
+ * Run on Naftali's computer. Refuses a git-tracked env file, and refuses
+ * GitHub Actions when the project URL is not the local stack.
  *
  * pnpm bootstrap:family --env test|production --family "The Breuning Family" --email person@example.test --label "Mom"
  */
@@ -13,6 +14,7 @@ import { buildInviteUrl } from "../supabase/functions/_shared/inviteLink.ts";
 import { buildInviteEmail } from "../supabase/functions/_shared/templates/invite.ts";
 import {
   assertEnvFileAllowed,
+  assertReadyToBootstrap,
   type BootstrapArgs,
   envFilePath,
   loadEnvFile,
@@ -21,6 +23,7 @@ import {
 
 export {
   assertEnvFileAllowed,
+  assertReadyToBootstrap,
   type BootstrapArgs,
   envFilePath,
   loadEnvFile,
@@ -78,11 +81,10 @@ export async function runBootstrap(
     throw new Error(`missing ${path}`);
   }
   const vars = loadEnvFile(text);
-  const url = vars.SUPABASE_URL;
-  const secret = vars.SUPABASE_SECRET_KEY;
-  if (!url || !secret) {
-    throw new Error("env file must set SUPABASE_URL and SUPABASE_SECRET_KEY");
-  }
+  const url = vars.SUPABASE_URL ?? "";
+  const secret = vars.SUPABASE_SECRET_KEY ?? "";
+  // Email settings and the hosted-Actions refusal run before any user or invite exists.
+  assertReadyToBootstrap(vars, url);
   applyEnv(vars);
 
   const admin = createClient(url, secret, {
@@ -110,7 +112,12 @@ export async function runBootstrap(
     p_email: args.email,
     p_label: args.label,
   });
-  if (error) throw new Error("bootstrap_family failed");
+  if (error) {
+    const detail = error.message.replace(/[\r\n]+/g, " ").slice(0, 240);
+    throw new Error(
+      detail ? `bootstrap_family failed: ${detail}` : "bootstrap_family failed",
+    );
+  }
   const row = (Array.isArray(data) ? data[0] : data) as {
     token?: string | null;
     reused?: boolean;

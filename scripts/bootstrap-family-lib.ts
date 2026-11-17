@@ -54,9 +54,6 @@ export function envFilePath(envName: string, root = Deno.cwd()): string {
 }
 
 export async function assertEnvFileAllowed(path: string): Promise<void> {
-  if (Deno.env.get("GITHUB_ACTIONS") === "true") {
-    throw new Error("bootstrap:family does not run in GitHub Actions");
-  }
   const parent = path.slice(0, Math.max(path.lastIndexOf("/"), 0)) || ".";
   const tracked = new Deno.Command("git", {
     args: ["ls-files", "--error-unmatch", "--", path],
@@ -88,4 +85,85 @@ export function loadEnvFile(text: string): Record<string, string> {
     out[key] = value;
   }
   return out;
+}
+
+const LOCAL_HOSTS = new Set([
+  "localhost",
+  "127.0.0.1",
+  "::1",
+  "0.0.0.0",
+  "kong",
+  "host.docker.internal",
+]);
+
+/** Same local hosts as the Mailpit transport. A hosted project is anything else. */
+export function isLocalSupabaseUrl(url: string): boolean {
+  let host = "";
+  let protocol = "";
+  try {
+    const parsed = new URL(url);
+    host = parsed.hostname.toLowerCase();
+    protocol = parsed.protocol;
+  } catch {
+    return false;
+  }
+  if (LOCAL_HOSTS.has(host) || host.includes("supabase_kong")) return true;
+  if (host.endsWith(".local") || host.endsWith(".internal")) return true;
+  return protocol === "http:" && !host.includes(".");
+}
+
+/**
+ * Real Actions must not bootstrap a hosted project (public logs, public inputs).
+ * CI may bootstrap the local Docker stack, whose URL is a loopback address.
+ */
+export function assertActionsTargetAllowed(url: string): void {
+  if (Deno.env.get("GITHUB_ACTIONS") !== "true") return;
+  if (isLocalSupabaseUrl(url)) return;
+  throw new Error(
+    "bootstrap:family does not run in GitHub Actions against a hosted project",
+  );
+}
+
+function filled(vars: Record<string, string>, key: string): boolean {
+  return Boolean(vars[key]?.trim());
+}
+
+/**
+ * Names that must be in the env file before any auth user or family row is created.
+ * Gmail settings live in that file: GitHub environment secrets are not on this computer.
+ */
+export function assertEmailConfigured(vars: Record<string, string>): void {
+  const transport = vars.EMAIL_TRANSPORT?.trim() ?? "";
+  const missing: string[] = [];
+  if (!transport) missing.push("EMAIL_TRANSPORT");
+  if (!filled(vars, "APP_URL")) missing.push("APP_URL");
+  if (!filled(vars, "EMAIL_FROM")) missing.push("EMAIL_FROM");
+  if (transport === "gmail") {
+    if (!filled(vars, "GMAIL_SMTP_USER")) missing.push("GMAIL_SMTP_USER");
+    if (!filled(vars, "GMAIL_SMTP_PASS")) missing.push("GMAIL_SMTP_PASS");
+  }
+  if (transport === "resend" && !filled(vars, "RESEND_API_KEY")) {
+    missing.push("RESEND_API_KEY");
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `env file must set ${missing.join(", ")} before creating a family`,
+    );
+  }
+  if (
+    transport !== "mailpit" && transport !== "gmail" && transport !== "resend"
+  ) {
+    throw new Error("EMAIL_TRANSPORT must be mailpit, gmail, or resend");
+  }
+}
+
+export function assertReadyToBootstrap(
+  vars: Record<string, string>,
+  url: string,
+): void {
+  if (!url.trim() || !filled(vars, "SUPABASE_SECRET_KEY")) {
+    throw new Error("env file must set SUPABASE_URL and SUPABASE_SECRET_KEY");
+  }
+  assertEmailConfigured(vars);
+  assertActionsTargetAllowed(url);
 }
