@@ -24,7 +24,9 @@ jobs:
       - run: pnpm build
 
   e2e:
-    runs-on: ubuntu-latest
+    # ubuntu-latest is Ubuntu 26.04, and older images in that pool omit the
+    # archive lists Playwright 1.65 needs for --with-deps. 24.04 has those packages.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

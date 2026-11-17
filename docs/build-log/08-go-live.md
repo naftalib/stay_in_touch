@@ -168,3 +168,5 @@ Greptile commented again after `43a162c`. The earlier table is unchanged.
 | 7 | Local checks erase production settings. The ops suite overwrote `.env.production.local` and the exit trap deleted it, including when an earlier step failed. | `scripts/deploy/ops-suite.sh` | fixed | The hosted-project refusal writes its env file in a temporary directory and runs bootstrap with that directory as the working directory. The suite no longer reads, writes, or deletes `.env.production.local`. |
 
 `scripts/deploy/hosted-refusal_test.sh` places a sentinel in `.env.production.local`, runs the refusal, runs the suite exit trap, and checks the sentinel is still the only line in the file.
+
+Run [44047862858](https://github.com/naftalib/stay_in_touch/actions/runs/44047862858) then failed in `e2e` on runner image `ubuntu-26.04` `20261111.82`. `playwright install --with-deps` refreshed only the Microsoft apt source, so the Ubuntu font and library packages were missing. The green run on `43a162c` used a newer `ubuntu-26.04` image (`20261111.196`) where those packages were present. The e2e job is pinned to `ubuntu-24.04`, whose package names match Playwright 1.65.
