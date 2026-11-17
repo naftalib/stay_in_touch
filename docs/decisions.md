@@ -156,6 +156,7 @@ This index mirrors the old table so existing links to `docs/decisions.md` still 
 | Explicitly not built at go-live | [0107](./decisions/0107-not-built-at-go-live.md) |
 | Every production backup waits for the production reviewer | [0108](./decisions/0108-production-backup-approval.md) |
 | Content-Security-Policy deferred | [0109](./decisions/0109-csp-deferred.md) |
+| Bootstrap in Actions is local-only; mail settings are checked first (refines 0105) | [0110](./decisions/0110-bootstrap-local-actions-path.md) |
 
 ## Future additions
 

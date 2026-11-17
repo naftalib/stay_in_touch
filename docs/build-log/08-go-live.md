@@ -9,11 +9,11 @@ Handoff 08: deploy the PWA and the Supabase project from GitHub Actions, bootstr
 ## Models
 
 - **Builder:** Grok 4.7
-- **Reviewer:** Grok 4.7 (a separate agent; findings not yet)
+- **Reviewer:** Grok 4.7 (a separate agent; findings below)
 
 ## PR
 
-None yet. The branch is `cursor/go-live-9e85`. The repository owner opens the pull request.
+https://github.com/naftalib/stay_in_touch/pull/8 on `cursor/go-live-9e85`. Not merged.
 
 ## What was built
 
@@ -53,7 +53,56 @@ None yet. The branch is `cursor/go-live-9e85`. The repository owner opens the pu
 
 ## Review findings and how each was resolved
 
-Not yet. Left for the reviewer.
+Reviewed against the handoff and `uploads/08-review-checklist.md` by a separate Grok 4.7 agent. Greptile scored the builder commit 0/5 with six comments. All six are fixed. None were declined.
+
+### Greptile review
+
+| # | Comment | File:line | Action | Reason or commit |
+|---|---|---|---|---|
+| 1 | CI rejects its own tests. `GITHUB_ACTIONS=true` refused bootstrap before a family was created, including the tracked-file unit test. | `scripts/bootstrap-family-lib.ts:57` | fixed | `f3363f5`. Actions still refuses a hosted URL. A local URL is allowed, which is the CI path. |
+| 2 | `backup.yml` asks for `actions: write` while the deploy caller grants only `contents: read`. | `.github/workflows/backup.yml:30` | fixed | `551e90f`. The write permission is removed. upload-artifact v4 uses the Actions runtime token, and a called workflow cannot raise the caller's grant. |
+| 3 | Restore unschedules `cleanup-orphan-invite-users`, and hosted-setup does not recreate it. | `scripts/restore.sh:109` | fixed | `42350db`. `private.schedule_cleanup_orphan_invite_users()` runs from hosted-setup. |
+| 4 | Bootstrap needs `EMAIL_TRANSPORT`, the Gmail settings, and `EMAIL_FROM`, which were not checked before it created anyone. | `scripts/bootstrap-family.ts:139` | fixed | `f3363f5`. Those names are required in the env file before any user or invite, and the runbook lists them. |
+| 5 | An expired first invite cannot be renewed. | `supabase/migrations/20261116200000_go_live.sql:106` | fixed | `42350db`. A later migration renews a pending invite whose `expires_at` has passed. A different email still cannot take the family name. |
+| 6 | Backup checkout ignores `inputs.git_sha` when Deploy calls it through `workflow_run`. | `.github/workflows/backup.yml:37` | fixed | `551e90f`. Checkout is `inputs.git_sha \|\| github.sha`. |
+
+The ops-suite proof of rows 1, 3, and 4 is `fd3fe35`.
+
+### Why the tests did not catch these
+
+| # | Why it slipped through | Test added |
+|---|---|---|
+| 1 | The tracked-file test never set `GITHUB_ACTIONS`. On a laptop that variable is unset, so the git error won. CI sets it for the whole process, so the Actions error won first and the e2e and ops calls died before creating a family. | The tracked-file test now sets `GITHUB_ACTIONS` and still expects `git tracks it`. A second test allows `http://127.0.0.1` and refuses `https://example.supabase.co`. The ops suite runs the successful bootstrap with `GITHUB_ACTIONS=true` and refuses a hosted URL before any user exists. |
+| 2 | Nothing compared the called workflow's token to the caller's. actionlint does not check that intersection. | `guards_test.sh` rejects any permission on `backup.yml` other than `contents: read`, and any `actions` permission on `deploy.yml`. |
+| 3 | The restore drill checked row counts and Mom's password. It never ran hosted-setup after unscheduling cron. | pgTAP unschedules the job and asserts the new function recreates exactly one row. The ops suite does the same through `hosted-setup.sh`, including after the restore. |
+| 4 | Every fixture env file already had `EMAIL_TRANSPORT` and `EMAIL_FROM`, so the missing-settings path never ran. Nothing checked that a failed send left zero users. | The unit test requires the Gmail names and asserts a sentinel value is not in the error. The ops suite uses an env file without `EMAIL_TRANSPORT` and checks `auth.users` stays empty. |
+| 5 | pgTAP re-ran bootstrap while the invite was still pending, then accepted it. It never moved `expires_at` into the past. | The same file expires the invite, rejects a different email, and asserts a new token and a future expiry. |
+| 6 | Nothing read the checkout expression. actionlint does not know that a called workflow sees the caller's event name, so `event_name == 'workflow_call'` looked valid. | `guards_test.sh` requires `inputs.git_sha \|\| github.sha` and rejects a `workflow_call` gate. actionlint 1.7.7 is clean on that expression. |
+
+### Other review findings
+
+- **Fixed.** `backup.yml` `workflow_dispatch` did not require `main` in the workflow file. Deploy already does. The backup job now runs a manual dispatch only on `refs/heads/main` (`551e90f`). The production environment is still the only backup environment, and it still has the required reviewer. There is no `production-backup` environment.
+- **Fixed.** `bootstrap_family` failures were replaced with the generic text `bootstrap_family failed`, so Naftali would not have seen `family name already exists`. The script now appends the PostgREST message (`f3363f5`).
+- **Pass.** `push-smoke.yml` was not edited.
+- **Pass.** No real secret, project ref, or Gmail address was added. Placeholders in the runbook are obvious.
+- **Pass.** Seed stays off on both remotes. The seed guard tests still pass.
+- **Pass.** pgTAP 30 files, 541 tests (8 new), `supabase db lint` clean, security advisors clean. The ops suite passed: local deploy, hosted-setup twice, orphan-job recreate, missing-mail refusal, hosted Actions refusal, bootstrap with `GITHUB_ACTIONS=true`, Mailpit invite, storage 79/81, backup, restore, three cron jobs restored, Mom signs in, production restore refused.
+- **Not re-run locally.** `pnpm test`, `pnpm test:e2e:pwa`, and `deno test` under `supabase/functions`. Those trees were not changed. CI still has to run them. The bootstrap e2e calls the same command the ops suite now runs with `GITHUB_ACTIONS=true`.
+
+### Checklist
+
+| Section | Result |
+|---|---|
+| 0 Run it | Pass for db, ops, actionlint, shellcheck, and the bootstrap Deno tests. Web unit tests, functions Deno tests, and the Playwright suite were left to CI. |
+| 1 Secrets and the public repo | Pass. Permissions stay `contents: read`. Production backups, monthly included, use `environment: production`. |
+| 2 Data safety | Pass. The restore drill still signs Mom in. Hosted-setup after restore reschedules all three jobs. |
+| 3 Bootstrap | Pass. Service-only pgTAP, expired renewal, orphan user kept while the invite is pending. |
+| 4 Hosting and headers | Pass on the builder's `wrangler dev` evidence. This review did not repeat that check; the header files were not changed. |
+| 5 Deploy correctness | Pass after the backup permission and sha fixes. Order in `deploy.sh` is unchanged. |
+| 6 Runbook and phone plan | Pass. The runbook now lists the bootstrap env-file keys and says to run hosted-setup after a restore. |
+| 7 Greptile | Pass. 6 comments, 6 fixed, 0 declined. |
+| 8 Tests and CI | Pass locally for the new tests. Full CI is the remaining gate. `push-smoke.yml` unchanged. |
+| 9 Docs | Pass. ADR 0110 refines 0105. ADR 0004 was already refined by 0097 and was not rewritten. |
 
 ## Deviations from the plan and why
 
