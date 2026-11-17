@@ -89,12 +89,23 @@ If the database push fails with `cannot install the realtime viewer policy` or `
 
 ## 7. [Naftali] Bootstrap a test family
 
-On your computer, not in Actions:
+On your computer, not in Actions. GitHub's copy of the Gmail password is not available here, so the gitignored env file has to carry the mail settings. The command checks them before it creates the user or the family. If the first invite expires before you accept it, run the same command again. It renews that invite.
 
 ```bash
 # .env.test.local is gitignored. Never commit it.
+cat > .env.test.local <<'EOF'
+SUPABASE_URL=https://<test-ref>.supabase.co
+SUPABASE_SECRET_KEY=<the test project secret key>
+APP_URL=https://stay-in-touch-test.<your-subdomain>.workers.dev
+EMAIL_TRANSPORT=gmail
+GMAIL_SMTP_USER=<the Gmail address>
+GMAIL_SMTP_PASS=<the app password>
+EMAIL_FROM=Stay In Touch <the Gmail address>
+EOF
 pnpm bootstrap:family --env test --family "Test Family" --email "you+test@gmail.com" --label "Mom"
 ```
+
+`GMAIL_SMTP_HOST` and `GMAIL_SMTP_PORT` can be omitted. They default to `smtp.gmail.com` and `465`.
 
 Open the invite from Gmail, accept it, and confirm you are an admin with a General space and a space titled Mom. Run the command again. It must not create a second family.
 
@@ -109,7 +120,7 @@ Once, at go-live, run the same drill the CI job runs, against the **test** proje
 1. Approve a backup of test (the backup workflow uses the `production` environment even for a manual run, because that is the only backup environment). For the test drill, run `scripts/backup.sh test` on your computer with `BACKUP_AGE_RECIPIENT` and a linked test project, so you do not download production.
 2. Restore that file onto test with `scripts/restore.sh <file> test` and `AGE_IDENTITY_FILE` pointing at the secret key.
 3. Confirm a known test user can still sign in.
-4. Re-run hosted setup if cron jobs are missing. Vault secrets are not in the dump.
+4. Run hosted setup again. Restore deletes every cron job, and Vault secrets are not in the dump. Hosted setup writes the Vault secrets and schedules `push-send-sweep`, `media-cleanup-daily`, and `cleanup-orphan-invite-users`.
 
 Never restore production data into test.
 
@@ -119,11 +130,13 @@ Start Deploy from the Actions tab on `main` and choose `production`, or let the 
 
 ## 11. [Naftali] Bootstrap the real family
 
+Create `.env.production.local` the same way as the test file, with the production URL, secret key, workers.dev address, and the same Gmail settings (`EMAIL_TRANSPORT=gmail`, `GMAIL_SMTP_USER`, `GMAIL_SMTP_PASS`, `EMAIL_FROM`). Do not commit it.
+
 ```bash
 pnpm bootstrap:family --env production --family "The Breuning Family" --email "<first parent>" --label "Mom"
 ```
 
-You are the first admin. Accept the invite on your phone. Do not pass `--force` unless you mean to add this parent to a project that already has members.
+You are the first admin. Accept the invite on your phone. If that invite expires first, run the same command again. It renews it. Do not pass `--force` unless you mean to add this parent to a project that already has members.
 
 ## 12. [Naftali] Staged rollout
 

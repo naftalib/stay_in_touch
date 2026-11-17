@@ -25,7 +25,7 @@ EMAIL_TRANSPORT=mailpit
 EMAIL_FROM=Stay In Touch <no-reply@example.test>
 MAILPIT_URL=http://127.0.0.1:54324
 EOF
-trap 'rm -f "$env_file"' EXIT
+trap 'rm -f "$env_file" "$REPO_ROOT/.env.production.local"' EXIT
 
 export SUPABASE_URL="$api_url"
 export VITE_SUPABASE_URL="$api_url"
@@ -57,6 +57,78 @@ fi
 echo "hosted-setup is safe to run twice"
 bash "$REPO_ROOT/scripts/deploy/hosted-setup.sh" local
 
+echo "hosted-setup recreates cleanup-orphan-invite-users after it is removed"
+local_psql -c "select cron.unschedule(jobid) from cron.job where jobname = 'cleanup-orphan-invite-users';"
+bash "$REPO_ROOT/scripts/deploy/hosted-setup.sh" local
+orphan="$(local_psql -At -c "select count(*) from cron.job where jobname = 'cleanup-orphan-invite-users'")"
+if [[ "$orphan" != "1" ]]; then
+  echo "cleanup-orphan-invite-users was not recreated (got ${orphan})" >&2
+  exit 1
+fi
+
+echo "bootstrap refuses missing email settings before it creates a user"
+cat >"$env_file" <<EOF
+SUPABASE_URL=$api_url
+SUPABASE_SECRET_KEY=$secret
+APP_URL=http://127.0.0.1:5173
+EOF
+set +e
+pnpm bootstrap:family --env test --force --family "No Mail" --email "nomail@example.test" --label "Mom" >/tmp/boot-nomail.out 2>&1
+nomail_status=$?
+set -e
+if [[ "$nomail_status" -eq 0 ]]; then
+  echo "bootstrap should have refused missing EMAIL_TRANSPORT" >&2
+  exit 1
+fi
+if ! grep -q 'EMAIL_TRANSPORT' /tmp/boot-nomail.out; then
+  echo "missing email settings were not named" >&2
+  cat /tmp/boot-nomail.out >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select count(*) from auth.users where email = 'nomail@example.test'")" != "0" ]]; then
+  echo "bootstrap created a user before checking email settings" >&2
+  exit 1
+fi
+
+echo "bootstrap refuses a hosted project in Actions before it creates a user"
+hosted_env="$REPO_ROOT/.env.production.local"
+cat >"$hosted_env" <<'EOF'
+SUPABASE_URL=https://example.supabase.co
+SUPABASE_SECRET_KEY=example-only
+APP_URL=https://stay-in-touch.example.workers.dev
+EMAIL_TRANSPORT=gmail
+GMAIL_SMTP_USER=sender@example.test
+GMAIL_SMTP_PASS=example-app-password
+EMAIL_FROM=Stay In Touch <sender@example.test>
+EOF
+set +e
+GITHUB_ACTIONS=true pnpm bootstrap:family --env production --family "Nope" --email "nobody@example.test" --label "Mom" >/tmp/boot-hosted.out 2>&1
+hosted_status=$?
+set -e
+rm -f "$hosted_env"
+if [[ "$hosted_status" -eq 0 ]]; then
+  echo "bootstrap should have refused a hosted URL in Actions" >&2
+  exit 1
+fi
+if ! grep -q 'hosted project' /tmp/boot-hosted.out; then
+  echo "hosted Actions refusal was not the hosted-project error" >&2
+  cat /tmp/boot-hosted.out >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select count(*) from auth.users where email = 'nobody@example.test'")" != "0" ]]; then
+  echo "bootstrap created a user before refusing the hosted Actions run" >&2
+  exit 1
+fi
+
+cat >"$env_file" <<EOF
+SUPABASE_URL=$api_url
+SUPABASE_SECRET_KEY=$secret
+APP_URL=http://127.0.0.1:5173
+EMAIL_TRANSPORT=mailpit
+EMAIL_FROM=Stay In Touch <no-reply@example.test>
+MAILPIT_URL=http://127.0.0.1:54324
+EOF
+
 echo "bootstrap refuses a populated project without --force"
 set +e
 pnpm bootstrap:family --env test --family "Ops Bootstrap" --email "ops-parent@example.test" --label "Mom" >/tmp/boot.out 2>&1
@@ -72,8 +144,8 @@ if grep -v 'bootstrap-family.ts' /tmp/boot.out | grep -q 'ops-parent@example.tes
   exit 1
 fi
 
-echo "bootstrap with --force"
-pnpm bootstrap:family --env test --force --family "Ops Bootstrap" --email "ops-parent@example.test" --label "Mom" >/tmp/boot.out 2>&1
+echo "bootstrap with --force on the local stack, including when Actions is set"
+GITHUB_ACTIONS=true pnpm bootstrap:family --env test --force --family "Ops Bootstrap" --email "ops-parent@example.test" --label "Mom" >/tmp/boot.out 2>&1
 if grep -v 'bootstrap-family.ts' /tmp/boot.out | grep -q 'ops-parent@example.test'; then
   echo "bootstrap logged the email address" >&2
   exit 1
@@ -99,7 +171,7 @@ print("invite email arrived")
 PY
 
 echo "bootstrap again does not add a family"
-pnpm bootstrap:family --env test --force --family "Ops Bootstrap" --email "ops-parent@example.test" --label "Mom" >/tmp/boot.out 2>&1
+GITHUB_ACTIONS=true pnpm bootstrap:family --env test --force --family "Ops Bootstrap" --email "ops-parent@example.test" --label "Mom" >/tmp/boot.out 2>&1
 families_again="$(local_psql -At -c "select count(*) from public.families where name = 'Ops Bootstrap'")"
 if [[ "$families_again" != "1" ]]; then
   echo "re-run created another family" >&2
@@ -166,6 +238,15 @@ after_messages="$(local_psql -At -c "select count(*) from public.messages")"
 after_users="$(local_psql -At -c "select count(*) from auth.users")"
 if [[ "$before_families" != "$after_families" || "$before_members" != "$after_members" || "$before_messages" != "$after_messages" || "$before_users" != "$after_users" ]]; then
   echo "restore counts differ families ${before_families}->${after_families} members ${before_members}->${after_members} messages ${before_messages}->${after_messages} users ${before_users}->${after_users}" >&2
+  exit 1
+fi
+
+echo "hosted-setup after restore puts the three jobs back"
+bash "$REPO_ROOT/scripts/deploy/hosted-setup.sh" local
+jobs="$(local_psql -At -c "select count(*) from cron.job where jobname in ('push-send-sweep', 'media-cleanup-daily', 'cleanup-orphan-invite-users')")"
+if [[ "$jobs" != "3" ]]; then
+  echo "expected 3 cron jobs after restore and hosted-setup, got ${jobs}" >&2
+  local_psql -c "select jobname from cron.job order by jobname" >&2 || true
   exit 1
 fi
 
