@@ -44,5 +44,34 @@ if grep -q 'sentinel-token-value-should-not-print' <<<"$out"; then
   fail "a secret value was printed"
 fi
 
+backup="$REPO_ROOT/.github/workflows/backup.yml"
+deploy="$REPO_ROOT/.github/workflows/deploy.yml"
+
+if grep -E '^[[:space:]]+(actions|pull-requests|id-token|checks|packages|deployments|security-events|statuses|attestations):' "$backup" >/dev/null; then
+  fail "backup.yml grants more than contents: read"
+fi
+if grep -E '^[[:space:]]+actions:' "$deploy" >/dev/null; then
+  fail "deploy.yml grants an actions permission"
+fi
+if ! grep -q 'environment: production' "$backup"; then
+  fail "backup.yml must use the production environment"
+fi
+if grep -q 'production-backup' "$backup"; then
+  fail "backup.yml must not name a reviewer-less backup environment"
+fi
+needle="ref: \${{ inputs.git_sha || github.sha }}"
+if ! grep -F "$needle" "$backup" >/dev/null; then
+  fail "backup checkout must use inputs.git_sha || github.sha"
+fi
+if grep -q "event_name == 'workflow_call'" "$backup"; then
+  fail "backup must not gate git_sha on event_name workflow_call"
+fi
+if ! grep -q "github.ref == 'refs/heads/main'" "$backup"; then
+  fail "backup workflow_dispatch must stay on main"
+fi
+if ! grep -q 'schedule_cleanup_orphan_invite_users' "$REPO_ROOT/scripts/deploy/hosted-setup.sh"; then
+  fail "hosted-setup must recreate cleanup-orphan-invite-users"
+fi
+
 echo "guard tests passed"
 rm -f /tmp/refuse-seed.out

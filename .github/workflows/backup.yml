@@ -21,20 +21,28 @@ permissions:
 jobs:
   backup:
     name: Encrypted backup and storage check
+    # A manual run must be main. Schedule uses the default branch. A called
+    # run keeps the caller's event name (workflow_run or workflow_dispatch).
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: production
     concurrency:
       group: backup-production
       cancel-in-progress: false
+    # contents: read only. upload-artifact v4 uses the Actions runtime token,
+    # not GITHUB_TOKEN actions: write. The deploy caller grants contents: read,
+    # and a called workflow cannot raise that.
     permissions:
       contents: read
-      actions: write
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.git_sha || github.sha }}
+          # Not gated on event_name == workflow_call: that name is the caller's
+          # event, so the condition was false for Deploy and github.sha (a newer
+          # main commit) was checked out instead. Empty input falls back to github.sha.
+          ref: ${{ inputs.git_sha || github.sha }}
       - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
         with:
           version: 3.1.0
