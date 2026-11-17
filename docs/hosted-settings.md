@@ -1,26 +1,41 @@
 # Hosted project settings
 
-There is no hosted project yet. When one is created:
+The click-by-click order is [`docs/go-live/runbook.md`](go-live/runbook.md). This page is the list of settings and the ones that are already in git. Do not copy the runbook into a second checklist.
 
-- Turn **public sign-up** off. The local config already has `enable_signup = false`.
-- Turn **Confirm email** on, and turn **Secure email change** on. `accept_invite` refuses an unconfirmed address.
-- In Realtime, turn **Allow public access** off. Clients subscribe with `private: true` and send the user JWT via `supabase.realtime.setAuth()`.
-- Set **JWT expiry** to **600 seconds** (Authentication → JWT expiry). Realtime checks membership when a client subscribes and keeps that decision until the token expires and the client refreshes or reconnects. The web client clears Realtime channels on `TOKEN_REFRESHED` so removed members pick up loss of access quickly. REST updates in the same transaction as the membership change. Local `config.toml` leaves `jwt_expiry = 3600` for developer convenience.
-- The migration that installs the Realtime select policy must run as a role that can assume `supabase_realtime_admin`. Hosted `postgres` is not a superuser. Confirm that membership before the first deploy. The local CLI path does not apply on a hosted database, and it does not leave `dblink` installed.
-- **Prototype email (no owned domain yet):** use **Gmail SMTP** (`smtp.gmail.com:465`, app password in secrets only) for Supabase Auth sign-in codes and set Edge Function secrets `EMAIL_TRANSPORT=gmail`, `GMAIL_SMTP_USER`, `GMAIL_SMTP_PASS`, `EMAIL_FROM`, `APP_URL`. Expect ~500 messages/day limits and spam-filter risk.
-- **Go-live:** verify a domain in Resend, switch Auth SMTP and `EMAIL_TRANSPORT=resend` with `RESEND_API_KEY`; no code change.
-- Function secrets for invite email: `EMAIL_TRANSPORT`, `APP_URL`, `EMAIL_FROM`, and provider-specific keys.
-- Set **minimum password length** to **6**. Supabase applies that minimum to every account, so a hosted minimum of 8 would reject the child password the invite screen accepts (ADR 0058). If adults should use a longer password, enforce that only in the adult UI.
-- **Photos bucket.** Migration `20261115201000_photos.sql` creates private bucket `photos` (5 MB, `image/jpeg`) when `storage.buckets` exists. Do not add client policies on `storage.objects`.
-- **Photo function secrets:** `MEDIA_PROVIDER=supabase`, `MEDIA_BUCKET=photos`, `MEDIA_PUBLIC_BASE_URL` (the project's public API origin, not the in-network Kong hostname), `MEDIA_UPLOAD_MAX_BYTES=5242880`, `MEDIA_CLEANUP_SECRET` (random, not committed). Leave `S3_*` unset until a move off Supabase Storage.
-- **Orphan cleanup.** Create Vault secrets `media_cleanup_secret` (same value as the function secret) and `media_cleanup_url` (the hosted function URL, `https://<ref>.supabase.co/functions/v1/media-cleanup`). Then schedule `media-cleanup-daily`, or re-apply the migration's schedule block. The function expects header `x-media-cleanup-secret`.
-- **Free-plan quotas.** Storage Free is 1 GB and 5 GB egress per month, shared with the whole project. The app stops at 800 MB. Going over the platform quota can restrict the whole project, not just uploads. Projects also pause after 7 days without activity.
-- **Moving photos to R2 or B2.** Set `MEDIA_PROVIDER` to `r2` or `b2` and set `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY`. Copy existing objects once. The S3 module is untested against a real bucket. R2 CORS is an S3 CORS rule allowing `PUT` and `GET` from the app origin. B2 CORS uses Backblaze's rule names `s3_put` and `s3_get` for those same methods. R2 has no spending cap, so add a Cloudflare billing alert. B2's no-card tier has its own daily caps.
-- Do not run `supabase/seed.sql` on the hosted database. Those accounts share a published local password.
-- Put the publishable key in `VITE_SUPABASE_PUBLISHABLE_KEY`. Never put the secret key in a `VITE_` variable or in the frontend bundle.
-- **API CORS.** The photo, invite, and push functions only reflect `APP_URL`. Local Kong still adds `Access-Control-Allow-Origin: *` and answers OPTIONS itself. On the hosted project, set the API allowed origins to the app origin so the gateway matches the functions. Sessions are bearer tokens, not cookies, so a foreign page cannot attach a user's token on its own.
-- **Web push.** Generate a VAPID pair with `pnpm push:keys` once. Store `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT` (`mailto:`), and `PUSH_SEND_SECRET` as Edge Function secrets. Set `PUSH_TRANSPORT=webpush`. Put the raw application-server public key in the Cloudflare Pages env as `VITE_VAPID_PUBLIC_KEY`. Rotating the pair invalidates every subscription. The next signed-in open compares the subscription's application server key with `VITE_VAPID_PUBLIC_KEY` and re-subscribes when they differ. A device that was turned off stays off until someone turns it on.
-- **Push schedule.** Enable `pg_net` and `pg_cron` if they are not already on. Create Vault secrets `push_send_secret` (the same value as the function secret) and `push_send_url` (`https://<ref>.supabase.co/functions/v1/push-send`). Then run `select private.schedule_push_send_sweep();`. The migration schedules the one-minute job only when both secrets exist. The job body is `{"sweep":true}` and the secret is copied into the cron command at schedule time. It is not in the migration file.
-- **Free-plan wakeups.** A free project pauses after 7 days without activity. The one-minute sweep is database activity, so a project that has the job scheduled stays awake. That also spends the free-tier cron and `pg_net` allowance every minute. Immediate sends still depend on `pg_net` from the insert trigger.
-- **Cloudflare cache.** Do not cache `sw.js` or `index.html`. Set `Cache-Control: no-cache` for both at the Pages/CDN layer, matching the local preview middleware. Hashed build assets can stay cached. A cached `sw.js` would pin families to an old worker.
-- **`APP_URL`.** Set it to the public app origin (`https://…`). Push links are built from it. The in-network Kong URL must not be used; the sender marks that misconfiguration as failed and does not store a payload.
+## Already in `supabase/config.toml` for both remotes
+
+Pushed by the deploy script. Local values are different on purpose (JWT 3600, confirmations off, email rate 2, seed on).
+
+- Public sign-up off.
+- Confirm email on, and secure email change on.
+- JWT expiry 600 seconds.
+- Minimum password length 6.
+- Auth email rate limit 60 per hour.
+- Site URL is `APP_URL`. Redirect allow-list is `APP_URL/**`.
+- SMTP is `smtp.gmail.com:465`, user and password from `GMAIL_SMTP_USER` and `GMAIL_SMTP_PASS`, sender name "Stay In Touch".
+- Seed disabled. Do not run `supabase/seed.sql` on either hosted project.
+
+## Dashboard, because CLI 3.1.0 has no key for them
+
+- Enable `pg_cron` and `pg_net` before the first database push.
+- Realtime: Allow public access off. Clients subscribe with `private: true`.
+- If the first `db push` fails with `cannot install the realtime viewer policy` or `must be owner of table messages`, the deploy script runs `scripts/deploy/realtime-policy.sql` and marks migration `20261112160007` applied. Hosted `postgres` can create the policy through supautils and cannot `SET ROLE supabase_realtime_admin`. That repair was not executed against a real project.
+
+## Closed
+
+- **API CORS.** The hosted gateway allows every origin. It cannot be set to the app origin. Edge Functions still reflect only `APP_URL`. Sessions are bearer tokens (ADR 0104).
+- **Leaked-password protection.** Pro only. Left off on the free plan (ADR 0104).
+
+## Secrets the deploy script sets
+
+Function secrets are written to a temp file and deleted. The log prints key names only. Hosted setup then upserts Vault `push_send_secret`, `push_send_url`, `media_cleanup_secret`, and `media_cleanup_url`, and schedules `push-send-sweep`, `media-cleanup-daily`, and `cleanup-orphan-invite-users`. Restore removes every cron job, so hosted setup creates the orphan-invite job again instead of only checking for it.
+
+Photo bytes stay in the private `photos` bucket (5 MB, `image/jpeg`). The database backup does not include those bytes.
+
+## Still true from earlier handoffs
+
+- The app stops uploads at 800 MB. Free-plan project storage is larger and is shared with the whole project. `scripts/storage-check.sh` fails at 80 percent.
+- A free project pauses after 7 days without activity. The one-minute sweep is activity once Vault secrets exist.
+- Moving photos to R2 or B2 is still the provider module from handoff 05. R2 has no spending cap. B2's no-card tier has daily caps.
+- Rotating the VAPID pair invalidates subscriptions. The client re-subscribes when the public key in the build changes.
+- `APP_URL` is the public workers.dev origin. The in-network Kong URL must not be used for push links.

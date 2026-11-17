@@ -10,8 +10,8 @@ flowchart LR
     Web["Vite + React + TS<br/>React Aria, CSS Modules"]
     SW["Service worker<br/>shell cache + push"]
   end
-  subgraph cf["Cloudflare (planned)"]
-    Pages["Static / PWA host"]
+  subgraph cf["Cloudflare Workers"]
+    Workers["Static assets<br/>workers.dev"]
     R2["R2 later<br/>(provider module)"]
   end
   subgraph supa["Supabase (in repo today)"]
@@ -28,7 +28,7 @@ flowchart LR
   subgraph future["Future"]
     API["FastAPI on Cloud Run<br/>api/ folder"]
   end
-  Web --> Pages
+  Web --> Workers
   Web --> Auth
   Web --> PG
   Web --> ST
@@ -51,7 +51,7 @@ flowchart LR
 | `supabase/functions/` | `invite-send`, media upload/finish/view/cleanup, `push-send` | **Implemented** |
 | `api/` | Later AI / Python services | README only |
 | `docs/` | Architecture, ADRs, build log, hosted checklist | Living docs |
-| `.github/workflows/` | Pull-request CI (web, e2e, functions, db) and the on-demand push smoke test | **Implemented** |
+| `.github/workflows/` | CI (web, e2e, functions, db, ops), push smoke, deploy, and the monthly backup | **Implemented** |
 
 For roles, tables, RLS, RPCs, and Realtime behavior, see the sections below. Planning ADRs are in [`docs/decisions/`](./decisions/).
 
@@ -79,9 +79,48 @@ Server state uses TanStack Query; routing does not use React Router data loaders
 
 Stay In Touch is a private, invite-only family app. One family has a General space plus one space for each parent and child. Grandparents do not get a space. Each space holds photos, videos, and one flat message thread. A message may quote-reply to another message in the same space.
 
+## Deployment
+
+GitHub Actions deploys `main` after CI succeeds. The `test` environment has no required reviewer. The `production` environment requires `naftalib`. A production deploy backs up first. The monthly backup uses that same environment, so it waits for approval. There is no reviewer-less backup environment.
+
+```mermaid
+flowchart TB
+  GH["GitHub main<br/>CI then Deploy"]
+  subgraph testEnv["Environment test"]
+    Tdb["Supabase test<br/>Auth, Postgres, Storage, Functions"]
+    Tw["Worker stay-in-touch-test<br/>workers.dev"]
+  end
+  subgraph prodEnv["Environment production<br/>required reviewer"]
+    Pdb["Supabase production"]
+    Pw["Worker stay-in-touch"]
+    Bak["age backup<br/>90-day artifact"]
+  end
+  GH --> Tdb
+  GH --> Tw
+  GH --> Bak
+  Bak --> Pdb
+  GH --> Pw
+  Tdb --> Jobs["pg_cron<br/>push-send-sweep every minute<br/>media-cleanup-daily<br/>cleanup-orphan-invite-users"]
+  Pdb --> Jobs
+```
+
+What lives where:
+
+| Piece | Where |
+|---|---|
+| App shell, service worker, hashed assets | Cloudflare Worker static assets |
+| Families, messages, RLS, cron, Vault | Supabase Postgres |
+| Sign-in and invite codes | Supabase Auth, Gmail SMTP |
+| Invite, photo, and push functions | Supabase Edge Functions |
+| Photo bytes | Supabase Storage bucket `photos` (not in the database backup) |
+| Encrypted database dump | GitHub Actions artifact, production environment |
+| Age secret key | Password manager and offline storage, not GitHub |
+
+The order inside a deploy is link, database push (dry-run, then push, never seed), config push, function secrets, functions, hosted setup (Vault and cron), web deploy, post-deploy check. Production runs the backup before that. Details are in [the go-live runbook](go-live/runbook.md).
+
 ## Stack
 
-- Frontend: Vite, React, TypeScript (`strict`), React Aria Components, CSS Modules. No Tailwind. The production build is a PWA (ADR 0077). Hosting on Cloudflare is still later.
+- Frontend: Vite, React, TypeScript (`strict`), React Aria Components, CSS Modules. No Tailwind. The production build is a PWA (ADR 0077) deployed as Cloudflare Workers static assets (ADR 0097).
 - Backend: Supabase. Postgres with row-level security, Auth, Realtime Broadcast, Storage, and Edge Functions.
 - Media: private Supabase Storage bucket `photos` for the prototype (ADR 0061). The database stores object keys, never URLs. R2 and B2 are provider modules, not wired to a bucket yet.
 - Email later: Resend as Auth SMTP. Web Push is VAPID through `push-send` (ADR 0081).

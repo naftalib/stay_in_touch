@@ -14,6 +14,9 @@ Host the PWA on Cloudflare.
 ## Consequences
 Aligns with R2 for media in the same vendor ecosystem. Planned, not deployed yet.
 
+## Refined
+ADR 0097 refines this decision. The PWA is a Workers static-assets site on a workers.dev address, with preview URLs off. Pages remains the fallback. This file is not rewritten.
+
 ## Status
 Accepted
 

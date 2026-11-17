@@ -18,6 +18,12 @@ web/e2e/.tmp/
 supabase/.temp/
 supabase/.branches/
 
+# Encrypted database backups. The plaintext is deleted; the age file still holds password hashes.
+/backups/
+
+# Wrangler local state from `wrangler dev` and deploy
+.wrangler/
+
 # Logs and OS files
 *.log
 npm-debug.log*

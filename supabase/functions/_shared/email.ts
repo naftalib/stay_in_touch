@@ -125,11 +125,15 @@ async function sendViaResend(input: SendEmailInput): Promise<void> {
   }
   if (res.status === 401) {
     console.error("Resend rejected the API key");
-    throw new Error("Email service rejected the request. Check the sending setup.");
+    throw new Error(
+      "Email service rejected the request. Check the sending setup.",
+    );
   }
   if (res.status === 422) {
     console.error("Resend could not deliver", await res.text());
-    throw new Error("The invitation email could not be delivered. Check the address.");
+    throw new Error(
+      "The invitation email could not be delivered. Check the address.",
+    );
   }
   if (!res.ok) {
     console.error("Resend send failed", res.status, await res.text());
@@ -137,8 +141,16 @@ async function sendViaResend(input: SendEmailInput): Promise<void> {
   }
 }
 
+function gmailTlsEnabled(): boolean {
+  const raw = (Deno.env.get("GMAIL_SMTP_TLS") ?? "on").toLowerCase();
+  return raw !== "off" && raw !== "0" && raw !== "false";
+}
+
 async function sendViaGmail(input: SendEmailInput): Promise<void> {
-  const host = smtpSafe(Deno.env.get("GMAIL_SMTP_HOST") ?? "smtp.gmail.com", "host");
+  const host = smtpSafe(
+    Deno.env.get("GMAIL_SMTP_HOST") ?? "smtp.gmail.com",
+    "host",
+  );
   const port = Number(Deno.env.get("GMAIL_SMTP_PORT") ?? "465");
   const user = smtpSafe(requireEnv("GMAIL_SMTP_USER"), "user");
   const pass = requireEnv("GMAIL_SMTP_PASS");
@@ -146,7 +158,13 @@ async function sendViaGmail(input: SendEmailInput): Promise<void> {
   const to = smtpSafe(input.to, "to");
   const subject = smtpSafe(input.subject, "subject");
 
-  const conn = await Deno.connectTls({ hostname: host, port });
+  // Tests speak plain SMTP to 127.0.0.1. Real Gmail stays implicit TLS on 465.
+  if (!gmailTlsEnabled() && host.toLowerCase().endsWith("gmail.com")) {
+    throw new Error("Gmail SMTP requires TLS");
+  }
+  const conn = gmailTlsEnabled()
+    ? await Deno.connectTls({ hostname: host, port })
+    : await Deno.connect({ hostname: host, port });
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   let buffer = "";

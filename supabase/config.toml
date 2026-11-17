@@ -461,3 +461,72 @@ enabled = true
 # formatted with uppercase keywords, indent 2, max width 180, trailing commas,
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
+
+# Hosted Auth for the two free projects. Local values above are unchanged.
+# A block applies only when its project_id equals the linked project ref.
+# The ids are the 20-letter shape the CLI requires and are not real projects.
+# The deploy script overrides the
+# matching project_id with SUPABASE_REMOTES_TEST_PROJECT_ID or
+# SUPABASE_REMOTES_PRODUCTION_PROJECT_ID (CLI 3: shell env beats the file).
+# site_url and SMTP read APP_URL, GMAIL_SMTP_USER, and GMAIL_SMTP_PASS.
+# APP_REDIRECT_ALLOW is derived as APP_URL + "/**" (env() must be the whole string).
+# Seed stays off. Do not set SUPABASE_DB_SEED_ENABLED.
+# Realtime "Allow public access" is not a config.toml key (CLI 3.1.0). The runbook turns it off.
+
+[remotes.test]
+project_id = "aaaaaaaaaaaaaaaaaaaa"
+
+[remotes.test.db.seed]
+enabled = false
+
+[remotes.test.auth]
+site_url = "env(APP_URL)"
+additional_redirect_urls = ["env(APP_REDIRECT_ALLOW)"]
+jwt_expiry = 600
+enable_signup = false
+minimum_password_length = 6
+
+[remotes.test.auth.rate_limit]
+email_sent = 60
+
+[remotes.test.auth.email]
+enable_confirmations = true
+double_confirm_changes = true
+
+[remotes.test.auth.email.smtp]
+enabled = true
+host = "smtp.gmail.com"
+port = 465
+user = "env(GMAIL_SMTP_USER)"
+pass = "env(GMAIL_SMTP_PASS)"
+admin_email = "env(GMAIL_SMTP_USER)"
+sender_name = "Stay In Touch"
+
+[remotes.production]
+project_id = "bbbbbbbbbbbbbbbbbbbb"
+
+[remotes.production.db.seed]
+enabled = false
+
+[remotes.production.auth]
+site_url = "env(APP_URL)"
+additional_redirect_urls = ["env(APP_REDIRECT_ALLOW)"]
+jwt_expiry = 600
+enable_signup = false
+minimum_password_length = 6
+
+[remotes.production.auth.rate_limit]
+email_sent = 60
+
+[remotes.production.auth.email]
+enable_confirmations = true
+double_confirm_changes = true
+
+[remotes.production.auth.email.smtp]
+enabled = true
+host = "smtp.gmail.com"
+port = 465
+user = "env(GMAIL_SMTP_USER)"
+pass = "env(GMAIL_SMTP_PASS)"
+admin_email = "env(GMAIL_SMTP_USER)"
+sender_name = "Stay In Touch"

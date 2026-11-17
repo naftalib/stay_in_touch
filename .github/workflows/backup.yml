@@ -1,0 +1,69 @@
+name: Backup
+
+# Every production backup, including the monthly run, uses the production
+# environment. That environment has a required reviewer, so the job waits
+# until Naftali approves it. There is no reviewer-less backup environment.
+on:
+  schedule:
+    - cron: "0 2 1 * *"
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      git_sha:
+        description: Commit to check out
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Encrypted backup and storage check
+    # A manual run must be main. Schedule uses the default branch. A called
+    # run keeps the caller's event name (workflow_run or workflow_dispatch).
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    concurrency:
+      group: backup-production
+      cancel-in-progress: false
+    # contents: read only. upload-artifact v4 uses the Actions runtime token,
+    # not GITHUB_TOKEN actions: write. The deploy caller grants contents: read,
+    # and a called workflow cannot raise that.
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Not gated on event_name == workflow_call: that name is the caller's
+          # event, so the condition was false for Deploy and github.sha (a newer
+          # main commit) was checked out instead. Empty input falls back to github.sha.
+          ref: ${{ inputs.git_sha || github.sha }}
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1
+        with:
+          version: 3.1.0
+      - name: Install age
+        run: sudo apt-get update && sudo apt-get install -y age
+      - name: Backup
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+        run: bash scripts/backup.sh production
+      - name: Upload encrypted backup
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: backup-production-${{ github.run_id }}
+          path: backups/backup-production-*.tar.age
+          retention-days: 90
+          if-no-files-found: error
+      - name: Storage check
+        env:
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: bash scripts/storage-check.sh production
