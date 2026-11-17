@@ -4,6 +4,8 @@
 set -euo pipefail
 # shellcheck source=scripts/deploy/lib.sh
 source "$(dirname "$0")/lib.sh"
+# shellcheck source=scripts/deploy/hosted-refusal.sh
+source "$(dirname "$0")/hosted-refusal.sh"
 cd "$REPO_ROOT"
 
 status_env="$(supabase status -o env)"
@@ -25,7 +27,8 @@ EMAIL_TRANSPORT=mailpit
 EMAIL_FROM=Stay In Touch <no-reply@example.test>
 MAILPIT_URL=http://127.0.0.1:54324
 EOF
-trap 'rm -f "$env_file" "$REPO_ROOT/.env.production.local"' EXIT
+# Remove only this suite's scratch test env. Leave the operator's production env file alone.
+trap 'rm -f "$env_file"' EXIT
 
 export SUPABASE_URL="$api_url"
 export VITE_SUPABASE_URL="$api_url"
@@ -91,21 +94,10 @@ if [[ "$(local_psql -At -c "select count(*) from auth.users where email = 'nomai
 fi
 
 echo "bootstrap refuses a hosted project in Actions before it creates a user"
-hosted_env="$REPO_ROOT/.env.production.local"
-cat >"$hosted_env" <<'EOF'
-SUPABASE_URL=https://example.supabase.co
-SUPABASE_SECRET_KEY=example-only
-APP_URL=https://stay-in-touch.example.workers.dev
-EMAIL_TRANSPORT=gmail
-GMAIL_SMTP_USER=sender@example.test
-GMAIL_SMTP_PASS=example-app-password
-EMAIL_FROM=Stay In Touch <sender@example.test>
-EOF
 set +e
-GITHUB_ACTIONS=true pnpm bootstrap:family --env production --family "Nope" --email "nobody@example.test" --label "Mom" >/tmp/boot-hosted.out 2>&1
+run_hosted_actions_refusal "$REPO_ROOT" /tmp/boot-hosted.out
 hosted_status=$?
 set -e
-rm -f "$hosted_env"
 if [[ "$hosted_status" -eq 0 ]]; then
   echo "bootstrap should have refused a hosted URL in Actions" >&2
   exit 1

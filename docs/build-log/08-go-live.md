@@ -158,3 +158,13 @@ Still open:
 - Wrangler 4.163.0
 - actionlint 1.7.7, shellcheck 0.9.0, age 1.1.1
 - Docker 29.1.3, Postgres 17.11
+
+## Follow-up review (2026-11-17)
+
+Greptile commented again after `43a162c`. The earlier table is unchanged.
+
+| # | Comment | File:line | Action | Reason |
+|---|---|---|---|---|
+| 7 | Local checks erase production settings. The ops suite overwrote `.env.production.local` and the exit trap deleted it, including when an earlier step failed. | `scripts/deploy/ops-suite.sh` | fixed | The hosted-project refusal writes its env file in a temporary directory and runs bootstrap with that directory as the working directory. The suite no longer reads, writes, or deletes `.env.production.local`. |
+
+`scripts/deploy/hosted-refusal_test.sh` places a sentinel in `.env.production.local`, runs the refusal, runs the suite exit trap, and checks the sentinel is still the only line in the file.
