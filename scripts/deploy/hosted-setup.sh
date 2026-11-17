@@ -63,6 +63,7 @@ end
 
 select private.schedule_push_send_sweep();
 select private.schedule_media_cleanup();
+select private.schedule_cleanup_orphan_invite_users();
 
 do \$do\$
 declare

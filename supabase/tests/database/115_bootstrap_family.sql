@@ -4,7 +4,7 @@ select set_config('search_path', 'public, extensions', true);
 
 \ir _fixtures.sql.inc
 
-select plan(23);
+select plan(31);
 
 select test.seed_user(
   'b1000000-0000-4000-8000-00000000000d',
@@ -20,6 +20,11 @@ select test.seed_user(
   'b1000000-0000-4000-8000-00000000000f',
   'expiredorphan@fixture.test',
   'Expired'
+);
+select test.seed_user(
+  'b1000000-0000-4000-8000-000000000010',
+  'otherparent@fixture.test',
+  'Dad'
 );
 
 select ok(
@@ -178,6 +183,69 @@ select is(
   'a second bootstrap does not create another family'
 );
 
+select set_config('test.boot_token_old', current_setting('test.boot_token'), true);
+update public.invitations
+set expires_at = pg_catalog.now() - interval '1 minute'
+where family_id = current_setting('test.boot_family')::uuid
+  and status = 'pending';
+
+select throws_ok(
+  $$select * from public.bootstrap_family(
+    'b1000000-0000-4000-8000-000000000010',
+    'Bootstrap Family',
+    'otherparent@fixture.test',
+    'Dad'
+  )$$,
+  '22023',
+  'family name already exists',
+  'an expired invite does not let a different email take the family name'
+);
+
+select set_config(
+  'test.boot_token',
+  (
+    select b.token
+    from public.bootstrap_family(
+      'b1000000-0000-4000-8000-00000000000d',
+      'Bootstrap Family',
+      'firstparent@fixture.test',
+      'Mom'
+    ) as b
+  ),
+  true
+);
+select ok(
+  current_setting('test.boot_token') <> ''
+    and current_setting('test.boot_token') is distinct from current_setting('test.boot_token_old'),
+  'an expired bootstrap invite is renewed with a new token'
+);
+select cmp_ok(
+  (
+    select i.expires_at
+    from public.invitations i
+    where i.family_id = current_setting('test.boot_family')::uuid
+      and i.status = 'pending'
+  ),
+  '>',
+  pg_catalog.now(),
+  'the renewed invite expires in the future'
+);
+select is(
+  (select count(*)::int from public.families where name = 'Bootstrap Family'),
+  1,
+  'renewing an expired invite does not create another family'
+);
+select is(
+  (
+    select count(*)::int
+    from public.invitations
+    where family_id = current_setting('test.boot_family')::uuid
+      and status = 'pending'
+  ),
+  1,
+  'renewal keeps a single pending invite'
+);
+
 select test.login('firstparent@fixture.test');
 set local role authenticated;
 select lives_ok(
@@ -283,6 +351,38 @@ select ok(
     select 1 from auth.users where id = 'b1000000-0000-4000-8000-00000000000e'
   ),
   'the pending bootstrap user is still kept'
+);
+
+select cron.unschedule(jobid)
+from cron.job
+where jobname = 'cleanup-orphan-invite-users';
+select private.schedule_cleanup_orphan_invite_users();
+select is(
+  (
+    select count(*)::int
+    from cron.job
+    where jobname = 'cleanup-orphan-invite-users'
+  ),
+  1,
+  'schedule_cleanup_orphan_invite_users recreates the job'
+);
+select private.schedule_cleanup_orphan_invite_users();
+select is(
+  (
+    select count(*)::int
+    from cron.job
+    where jobname = 'cleanup-orphan-invite-users'
+  ),
+  1,
+  'scheduling orphan cleanup twice leaves one job'
+);
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'private.schedule_cleanup_orphan_invite_users()',
+    'execute'
+  ),
+  'authenticated cannot execute schedule_cleanup_orphan_invite_users'
 );
 
 select * from finish();

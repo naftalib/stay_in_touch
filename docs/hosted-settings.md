@@ -28,7 +28,7 @@ Pushed by the deploy script. Local values are different on purpose (JWT 3600, co
 
 ## Secrets the deploy script sets
 
-Function secrets are written to a temp file and deleted. The log prints key names only. Hosted setup then upserts Vault `push_send_secret`, `push_send_url`, `media_cleanup_secret`, and `media_cleanup_url`, and schedules `push-send-sweep`, `media-cleanup-daily`, and checks `cleanup-orphan-invite-users`.
+Function secrets are written to a temp file and deleted. The log prints key names only. Hosted setup then upserts Vault `push_send_secret`, `push_send_url`, `media_cleanup_secret`, and `media_cleanup_url`, and schedules `push-send-sweep`, `media-cleanup-daily`, and `cleanup-orphan-invite-users`. Restore removes every cron job, so hosted setup creates the orphan-invite job again instead of only checking for it.
 
 Photo bytes stay in the private `photos` bucket (5 MB, `image/jpeg`). The database backup does not include those bytes.
 
