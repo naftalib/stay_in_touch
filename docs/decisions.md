@@ -157,6 +157,7 @@ This index mirrors the old table so existing links to `docs/decisions.md` still 
 | Every production backup waits for the production reviewer | [0108](./decisions/0108-production-backup-approval.md) |
 | Content-Security-Policy deferred | [0109](./decisions/0109-csp-deferred.md) |
 | Bootstrap in Actions is local-only; mail settings are checked first (refines 0105) | [0110](./decisions/0110-bootstrap-local-actions-path.md) |
+| Hosted SQL uses the Supavisor session pooler (refines 0033) | [0111](./decisions/0111-session-pooler-for-hosted-sql.md) |
 
 ## Future additions
 

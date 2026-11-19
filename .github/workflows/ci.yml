@@ -198,6 +198,7 @@ jobs:
         run: |
           bash scripts/deploy/guards_test.sh
           bash scripts/deploy/db-push_test.sh
+          bash scripts/deploy/pooler_test.sh
           bash scripts/deploy/hosted-refusal_test.sh
           deno test --allow-env --allow-net=127.0.0.1 --allow-read --allow-write --allow-run scripts/bootstrap-family_test.ts scripts/post-deploy-check_test.ts
       - name: Build env is baked per environment

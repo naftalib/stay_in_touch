@@ -23,3 +23,5 @@ Copy [`_template.md`](./_template.md) when starting a new entry. Keep entries sh
 | 05 | [Photos](./05-photos.md) | 15 Nov 2026 |
 | 06 | [Install, notifications and offline](./06-pwa-push.md) | 16 Nov 2026 |
 | 07 | [Real push smoke test](./07-push-smoke-test.md) | 16 Nov 2026 |
+| 08 | [Go-live](./08-go-live.md) | 16 Nov 2026 |
+| 09 | [Realtime repair over the session pooler](./09-realtime-repair-fix.md) | 19 Nov 2026 |

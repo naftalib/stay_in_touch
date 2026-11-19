@@ -115,8 +115,11 @@ What lives where:
 | Photo bytes | Supabase Storage bucket `photos` (not in the database backup) |
 | Encrypted database dump | GitHub Actions artifact, production environment |
 | Age secret key | Password manager and offline storage, not GitHub |
+| Hosted Postgres from Actions | Supavisor session pooler, IPv4, port 5432 |
 
 The order inside a deploy is link, database push (dry-run, then push, never seed), config push, function secrets, functions, hosted setup (Vault and cron), web deploy, post-deploy check. Production runs the backup before that. Details are in [the go-live runbook](go-live/runbook.md).
+
+Hosted SQL from GitHub Actions opens Postgres through the Supavisor session pooler: port 5432, user `postgres.<project ref>`, `sslmode=require`. That pooler is IPv4 on every plan. The direct host `db.<ref>.supabase.co` is IPv6-only on the free plan, and GitHub-hosted runners have no IPv6. `supabase link` stores the pooler host in `supabase/.temp/pooler-url`. The host's cluster index is not derived from the region. If that file is missing, the script reads `db_host` from the Management API pooler config. The same connection is used for the Realtime policy repair, backups, hosted setup, the storage check, and restore (ADR 0111).
 
 ## Stack
 
@@ -213,6 +216,8 @@ Admin UI routes: `/f/:familyId/members`, `/f/:familyId/spaces`. Public accept ro
 Inserts and updates of `messages` and `media` call `realtime.send` on the topic `space:<space_id>`. Soft deletes are updates. The payload record is `{ id, space_id }` plus `table` and `operation`. `realtime.send` also adds its own broadcast id. Body, caption, and object keys are absent. Clients refetch the row under RLS. A media notice also refreshes the Pics tab. There is no client insert policy on `realtime.messages`, so clients cannot publish.
 
 The select policy allows `authenticated` only when the extension is `broadcast`, the row's topic equals `realtime.topic()`, and that topic is `space:<id>` for an id in `viewable_space_ids()`. Clients must subscribe with `private: true` and `supabase.realtime.setAuth()`. On a hosted project, turn **Allow public access** off.
+
+Local databases install that policy inside migration `20261112160007` by asking the local superuser over `dblink` (ADR 0033). Hosted `postgres` is not a superuser and cannot assume `supabase_realtime_admin`, so that migration fails closed. The deploy repair then runs `scripts/deploy/realtime-policy.sql` as `postgres` on the session pooler. `supautils` allows that role to create and drop the policy. ADR 0111.
 
 Realtime authorizes when the client joins and keeps that decision until the JWT is refreshed or the socket reconnects. REST access ends in the same transaction as `remove_member`. A socket that was already open can still receive the minimal notice. It cannot read the post. Keep `jwt_expiry` short on the hosted project.
 

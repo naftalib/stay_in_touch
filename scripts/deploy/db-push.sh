@@ -2,7 +2,9 @@
 # Dry-run, then push. Never passes --include-seed.
 # On a hosted project, migration 20261112160007 fails closed because local
 # dblink cannot run there. This script then installs the policy as postgres
-# (supautils allows that) and marks that one version applied.
+# over the Supavisor session pooler and marks that one version applied.
+# A project that already applied 20261112160000-20261112160006 and has not
+# recorded 20261112160007 takes this path, then the retry pushes the rest.
 set -euo pipefail
 # shellcheck source=scripts/deploy/lib.sh
 source "$(dirname "$0")/lib.sh"
