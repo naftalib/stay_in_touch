@@ -25,6 +25,8 @@ supabase/.branches/
 .wrangler/
 
 # Logs and OS files
+__pycache__/
+*.pyc
 *.log
 npm-debug.log*
 pnpm-debug.log*

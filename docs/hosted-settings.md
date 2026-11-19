@@ -19,7 +19,7 @@ Pushed by the deploy script. Local values are different on purpose (JWT 3600, co
 
 - Enable `pg_cron` and `pg_net` before the first database push.
 - Realtime: Allow public access off. Clients subscribe with `private: true`.
-- If the first `db push` fails with `cannot install the realtime viewer policy` or `must be owner of table messages`, the deploy script runs `scripts/deploy/realtime-policy.sql` and marks migration `20261112160007` applied. Hosted `postgres` can create the policy through supautils and cannot `SET ROLE supabase_realtime_admin`. That repair was not executed against a real project.
+- If `db push` fails with `cannot install the realtime viewer policy` or `must be owner of table messages`, the deploy script runs `scripts/deploy/realtime-policy.sql` as `postgres` over the Supavisor session pooler and marks migration `20261112160007` applied. Hosted `postgres` can create and drop the policy through supautils. It cannot `SET ROLE supabase_realtime_admin`. The first test deploy hit the IPv6-only direct host; the repair now uses the pooler (ADR 0111). That pooler repair has not been executed against the test project yet.
 
 ## Closed
 

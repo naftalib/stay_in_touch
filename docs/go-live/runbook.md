@@ -85,7 +85,9 @@ If a name is missing, the script prints `missing required name:` and the name. I
 
 Merge to `main`. CI runs. When CI succeeds, Deploy runs the test job. Read the post-deploy check in the log. It must say the check passed: no-cache shell, JavaScript service worker, deep link returns HTML.
 
-If the database push fails with `cannot install the realtime viewer policy` or `must be owner of table messages`, the script applies `scripts/deploy/realtime-policy.sql` as the database owner, marks migration `20261112160007` applied, and pushes again. This path was not run against a real project. Watch the first test deploy. If the repair does not run, stop and do not approve production.
+The first test deploy applied migrations `20261112160000` through `20261112160006`. `20261112160007_realtime_policy.sql` then failed closed: hosted `postgres` cannot assume `supabase_realtime_admin`, and the local `dblink` host does not exist. The repair tried the direct database host `db.<ref>.supabase.co`. On the free plan that host is IPv6-only, and the GitHub runner has no IPv6, so `psql` ended with "Network is unreachable".
+
+The repair now uses the Supavisor session pooler, which is IPv4. The host is the one `supabase link` wrote to `supabase/.temp/pooler-url`. If that file is missing or is not a shared pooler host, the script reads `db_host` from the Management API. The region name is not turned into a hostname. The connection is port 5432, user `postgres.<ref>`, and `sslmode=require`. The script applies `scripts/deploy/realtime-policy.sql` as `postgres`, marks `20261112160007` applied, and pushes again. Re-run Deploy on the test project. It should continue from the migration that is not recorded and finish all 21 migrations. If the repair fails, stop and do not approve production. CI checks the host selection and the repair command with fakes. The pooler repair has not been executed against the test project yet.
 
 ## 7. [Naftali] Bootstrap a test family
 
@@ -118,7 +120,7 @@ Follow [phone-test-plan.md](./phone-test-plan.md) against the test URL. About 20
 Once, at go-live, run the same drill the CI job runs, against the **test** project only:
 
 1. Approve a backup of test (the backup workflow uses the `production` environment even for a manual run, because that is the only backup environment). For the test drill, run `scripts/backup.sh test` on your computer with `BACKUP_AGE_RECIPIENT` and a linked test project, so you do not download production.
-2. Restore that file onto test with `scripts/restore.sh <file> test` and `AGE_IDENTITY_FILE` pointing at the secret key.
+2. Restore that file onto test with `scripts/restore.sh <file> test` and `AGE_IDENTITY_FILE` pointing at the secret key. Restore opens the database on the same session pooler as the deploy repair, so the checkout has to be linked first.
 3. Confirm a known test user can still sign in.
 4. Run hosted setup again. Restore deletes every cron job, and Vault secrets are not in the dump. Hosted setup writes the Vault secrets and schedules `push-send-sweep`, `media-cleanup-daily`, and `cleanup-orphan-invite-users`.
 
