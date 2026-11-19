@@ -13,7 +13,7 @@ Handoff 09: the first hosted deploy's Realtime policy repair connected to the IP
 
 ## PR
 
-Opened from `cursor/realtime-pooler-repair-d009`. The pull request URL is added when the request exists.
+https://github.com/naftalib/stay_in_touch/pull/9 on `cursor/realtime-pooler-repair-d009`.
 
 ## What was built
 
