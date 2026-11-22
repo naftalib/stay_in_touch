@@ -184,7 +184,7 @@ if ! grep -q 'reset is refused for production' /tmp/boot.out; then
   cat /tmp/boot.out >&2
   exit 1
 fi
-if grep -q 'missing .env.production.local' /tmp/boot.out; then
+if grep -q 'missing ' /tmp/boot.out; then
   echo "production reset tried to read an env file" >&2
   exit 1
 fi

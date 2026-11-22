@@ -59,33 +59,53 @@ async function findUserByEmail(
   return null;
 }
 
-async function confirmUser(admin: SupabaseClient, userId: string): Promise<void> {
+async function confirmUser(
+  admin: SupabaseClient,
+  userId: string,
+): Promise<void> {
   const updated = await admin.auth.admin.updateUserById(userId, {
     email_confirm: true,
   });
   if (updated.error) throw new Error("could not confirm the auth user");
 }
 
+type PreparedUser = {
+  id: string;
+  created: boolean;
+  needsConfirm: boolean;
+};
+
 /**
  * Public signup is closed. GoTrue treats an unconfirmed address as a signup,
  * so the invite code returns signup_disabled unless the user is confirmed
- * (ADR 0060, ADR 0112). A re-run confirms an existing unconfirmed user.
+ * (ADR 0060, ADR 0112). Confirmation of an existing user waits until
+ * bootstrap_family succeeds, so a refused re-run does not confirm a stranger.
  */
 async function findOrCreateUser(
   admin: SupabaseClient,
   email: string,
   label: string,
-): Promise<string> {
+): Promise<PreparedUser> {
+  const existing = await findUserByEmail(admin, email);
+  if (existing?.id) {
+    return {
+      id: existing.id,
+      created: false,
+      needsConfirm: !existing.email_confirmed_at,
+    };
+  }
+
   const created = await admin.auth.admin.createUser({
     email,
     email_confirm: true,
     user_metadata: { display_name: label },
   });
   if (!created.error && created.data.user?.id) {
-    if (!created.data.user.email_confirmed_at) {
-      await confirmUser(admin, created.data.user.id);
-    }
-    return created.data.user.id;
+    return {
+      id: created.data.user.id,
+      created: true,
+      needsConfirm: !created.data.user.email_confirmed_at,
+    };
   }
 
   const message = created.error?.message.toLowerCase() ?? "";
@@ -98,8 +118,11 @@ async function findOrCreateUser(
 
   const match = await findUserByEmail(admin, email);
   if (!match?.id) throw new Error("could not find the auth user");
-  if (!match.email_confirmed_at) await confirmUser(admin, match.id);
-  return match.id;
+  return {
+    id: match.id,
+    created: false,
+    needsConfirm: !match.email_confirmed_at,
+  };
 }
 
 async function runReset(args: BootstrapArgs, root: string): Promise<void> {
@@ -184,51 +207,63 @@ export async function runBootstrap(
     }
   }
 
-  const userId = await findOrCreateUser(admin, args.email, args.label);
-  const { data, error } = await admin.rpc("bootstrap_family", {
-    p_user_id: userId,
-    p_family_name: args.family,
-    p_email: args.email,
-    p_label: args.label,
-  });
-  if (error) {
-    const detail = error.message.replace(/[\r\n]+/g, " ").slice(0, 240);
-    throw new Error(
-      detail ? `bootstrap_family failed: ${detail}` : "bootstrap_family failed",
-    );
-  }
-  const row = (Array.isArray(data) ? data[0] : data) as {
-    token?: string | null;
-    reused?: boolean;
-  } | null;
-  if (!row) throw new Error("bootstrap_family returned nothing");
+  const prepared = await findOrCreateUser(admin, args.email, args.label);
+  let bootstrapped = false;
+  try {
+    const { data, error } = await admin.rpc("bootstrap_family", {
+      p_user_id: prepared.id,
+      p_family_name: args.family,
+      p_email: args.email,
+      p_label: args.label,
+    });
+    if (error) {
+      const detail = error.message.replace(/[\r\n]+/g, " ").slice(0, 240);
+      throw new Error(
+        detail
+          ? `bootstrap_family failed: ${detail}`
+          : "bootstrap_family failed",
+      );
+    }
+    bootstrapped = true;
+    if (prepared.needsConfirm) await confirmUser(admin, prepared.id);
+    const row = (Array.isArray(data) ? data[0] : data) as {
+      token?: string | null;
+      reused?: boolean;
+    } | null;
+    if (!row) throw new Error("bootstrap_family returned nothing");
 
-  if (!row.token) {
-    console.log(
-      row.reused
-        ? "family already has this admin; nothing sent"
-        : "no invite token",
-    );
-    return;
-  }
+    if (!row.token) {
+      console.log(
+        row.reused
+          ? "family already has this admin; nothing sent"
+          : "no invite token",
+      );
+      return;
+    }
 
-  const appUrl = Deno.env.get("APP_URL");
-  if (!appUrl) throw new Error("APP_URL is not set");
-  const inviteUrl = buildInviteUrl(appUrl, row.token);
-  const mail = buildInviteEmail({
-    familyName: args.family,
-    inviterName: args.label,
-    label: args.label,
-    inviteUrl,
-    expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-  });
-  await sendEmail({
-    to: args.email,
-    subject: mail.subject,
-    html: mail.html,
-    text: mail.text,
-  });
-  console.log(row.reused ? "invite sent again" : "family ready; invite sent");
+    const appUrl = Deno.env.get("APP_URL");
+    if (!appUrl) throw new Error("APP_URL is not set");
+    const inviteUrl = buildInviteUrl(appUrl, row.token);
+    const mail = buildInviteEmail({
+      familyName: args.family,
+      inviterName: args.label,
+      label: args.label,
+      inviteUrl,
+      expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+    });
+    await sendEmail({
+      to: args.email,
+      subject: mail.subject,
+      html: mail.html,
+      text: mail.text,
+    });
+    console.log(row.reused ? "invite sent again" : "family ready; invite sent");
+  } catch (caught) {
+    if (prepared.created && !bootstrapped) {
+      await admin.auth.admin.deleteUser(prepared.id);
+    }
+    throw caught;
+  }
 }
 
 async function main(): Promise<void> {

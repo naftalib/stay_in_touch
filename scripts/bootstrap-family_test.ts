@@ -28,12 +28,21 @@ Deno.test("bootstrap args require env, family, email, and label", () => {
 });
 
 Deno.test("reset is refused for production before other flags are accepted", () => {
-  for (const argv of [
-    ["--env", "production", "--reset"],
-    ["--env", "production", "--reset", "--confirm-reset"],
-    ["--env", "production", "--reset", "--confirm-reset", "--force"],
-    ["--env", "production", "--reset", "--confirm-reset", "--family", "Test Family"],
-  ]) {
+  for (
+    const argv of [
+      ["--env", "production", "--reset"],
+      ["--env", "production", "--reset", "--confirm-reset"],
+      ["--env", "production", "--reset", "--confirm-reset", "--force"],
+      [
+        "--env",
+        "production",
+        "--reset",
+        "--confirm-reset",
+        "--family",
+        "Test Family",
+      ],
+    ]
+  ) {
     try {
       parseArgs(argv);
       throw new Error("expected production refusal");
@@ -113,7 +122,14 @@ Deno.test("reset names the family and email and does not require a label", () =>
   assertEquals(args.label, "");
   assertEquals(args.family, "Test Family");
   try {
-    parseArgs(["--env", "test", "--reset", "--confirm-reset", "--family", "Test Family"]);
+    parseArgs([
+      "--env",
+      "test",
+      "--reset",
+      "--confirm-reset",
+      "--family",
+      "Test Family",
+    ]);
     throw new Error("expected email refusal");
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : "";
@@ -247,12 +263,18 @@ Deno.test("bootstrap checks email settings and the hosted URL before creating a 
   const create = source.indexOf("await findOrCreateUser");
   const rpc = source.indexOf('rpc("bootstrap_family"');
   const resetRpc = source.indexOf('rpc("reset_unjoined_bootstrap_family"');
+  const confirm = source.indexOf("await confirmUser(");
   assertEquals(gate > 0 && gate < check, true);
   assertEquals(check > 0 && create > check && rpc > check, true);
   assertEquals(resetRpc > gate && create > resetRpc, true);
   assertEquals(source.includes("email_confirm: true"), true);
   assertEquals(source.includes("updateUserById"), true);
   assertEquals(source.includes("email_confirm: false"), false);
+  // An existing unconfirmed user is confirmed only after the family RPC
+  // succeeds. A user this command just created is deleted if that RPC fails.
+  assertEquals(rpc < confirm, true);
+  assertEquals(source.includes("prepared.created && !bootstrapped"), true);
+  assertEquals(source.indexOf("deleteUser(") > rpc, true);
 
   withActions("true", () => {
     try {

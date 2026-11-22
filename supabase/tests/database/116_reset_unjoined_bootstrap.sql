@@ -4,7 +4,7 @@ select set_config('search_path', 'public, extensions', true);
 
 \ir _fixtures.sql.inc
 
-select plan(41);
+select plan(49);
 
 select test.seed_user(
   'c1000000-0000-4000-8000-000000000001',
@@ -74,6 +74,49 @@ select ok(
     '{}'
   ) && array['search_path=""', 'search_path='],
   'public.reset_unjoined_bootstrap_family pins search_path'
+);
+select ok(
+  (
+    select p.prosecdef
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'reset_unjoined_bootstrap_family'
+  ),
+  'public.reset_unjoined_bootstrap_family is security definer'
+);
+select ok(
+  (
+    select p.prosecdef
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'private'
+      and p.proname = 'reset_unjoined_bootstrap_family'
+  ),
+  'private.reset_unjoined_bootstrap_family is security definer'
+);
+select ok(
+  coalesce(
+    (
+      select p.proconfig
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'private'
+        and p.proname = 'reset_unjoined_bootstrap_family'
+    ),
+    '{}'
+  ) && array['search_path=""', 'search_path='],
+  'private.reset_unjoined_bootstrap_family pins search_path'
+);
+select ok(
+  pg_get_functiondef('private.reset_unjoined_bootstrap_family(text,text,text)'::regprocedure)
+    ~ 'from auth\.users u[[:space:]]+where u\.id = creator[[:space:]]+and private\.normalized_email\(u\.email\) = normalized[[:space:]]+for update',
+  'reset locks the auth user before it reads sign-in state'
+);
+select ok(
+  pg_get_functiondef('private.reset_unjoined_bootstrap_family(text,text,text)'::regprocedure)
+    ~ 'perform 1[[:space:]]+from public\.invitations i[[:space:]]+where i\.family_id = fam[[:space:]]+for update',
+  'reset locks the invite rows before it reads them'
 );
 
 set local role authenticated;
@@ -294,6 +337,34 @@ select is(
 update auth.users
 set last_sign_in_at = null
 where email = 'resetme@fixture.test';
+insert into auth.sessions (id, user_id)
+values (
+  'c1000000-0000-4000-8000-000000000099',
+  'c1000000-0000-4000-8000-000000000001'
+);
+select throws_ok(
+  $$select public.reset_unjoined_bootstrap_family(
+    'Reset Family',
+    'resetme@fixture.test',
+    'confirm-reset'
+  )$$,
+  '22023',
+  'this family has been signed into',
+  'a session blocks reset even when last_sign_in_at is null'
+);
+select ok(
+  exists (
+    select 1 from auth.users where email = 'resetme@fixture.test'
+  ),
+  'the session user is still there'
+);
+select is(
+  (select count(*)::int from public.families where name = 'Reset Family'),
+  1,
+  'the session family is still there'
+);
+delete from auth.sessions
+where id = 'c1000000-0000-4000-8000-000000000099';
 insert into public.push_subscriptions (user_id, endpoint, p256dh, auth)
 values (
   'c1000000-0000-4000-8000-000000000001',

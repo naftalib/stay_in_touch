@@ -9,22 +9,24 @@ Handoff 10: `bootstrap:family` created an unconfirmed auth user, so the hosted i
 ## Models
 
 - **Builder:** Grok 4.7
-- **Reviewer:** not run in this handoff
+- **Reviewer:** Grok 4.7
 
 ## PR
 
-Link added when the pull request opens.
+https://github.com/naftalib/stay_in_touch/pull/10
 
 ## What was built
 
-- `findOrCreateUser` creates the auth user with `email_confirm: true`. If the address already exists and is unconfirmed, `updateUserById` confirms it. The same family name and email still reuse one family.
-- `--reset --confirm-reset` is test-only. Production is refused before the env file is read. `public.reset_unjoined_bootstrap_family` deletes one unjoined bootstrap family, its General space, its pending invite, its audit rows, and that invite's auth user. A family with a member, content, a sign-in, or any other row is left in place. A second reset is a no-op.
+- `findOrCreateUser` creates the auth user with `email_confirm: true`. If the address already exists and is unconfirmed, `updateUserById` confirms it only after `bootstrap_family` succeeds. A user this command just created is deleted if that RPC fails. The same family name and email still reuse one family.
+- `--reset --confirm-reset` is test-only. Production is refused before the env file is read. `public.reset_unjoined_bootstrap_family` deletes one unjoined bootstrap family, its General space, its pending invite, its audit rows, and that invite's auth user. It locks the auth user before it reads sign-in state. A family with a member, content, a sign-in, or any other row is left in place. A second reset is a no-op.
 - The runbook's test invite address is `<your-gmail>+mom@gmail.com`. Plus-addresses of `breuningapp@gmail.com` are the inbox that works. The current test project has PowerShell commands to reset `you+test@gmail.com` and bootstrap again.
 - Ops CI runs bootstrap against local Auth with signup off and confirmations on, then `signInWithOtp` with `create_user: false`. An unconfirmed user gets 422 `signup_disabled`. After bootstrap, Mailpit receives the code. Reset's production refusal and the member refusal run in the same job. pgTAP covers the delete bounds.
 
 ## Review findings and how each was resolved
 
-Not yet. No review has run on this handoff.
+- **Fixed.** `private.reset_unjoined_bootstrap_family` read `last_sign_in_at` and `auth.sessions` without locking `auth.users`. A sign-in could commit after those reads and still be deleted, because the later checks only look at app rows and `auth.users` cascades to sessions. pgTAP runs in one transaction, so nothing interleaved a sign-in, and no test asserted `for update`. The follow-up migration locks the auth user before the sign-in read and holds that lock through the delete. The delete itself matches only a user with `last_sign_in_at` null and no session. The invite and space rows are locked the same way, then re-read before the family delete. pgTAP now requires those locks in the function body, and a session row blocks reset while `last_sign_in_at` is null.
+- **Fixed.** `findOrCreateUser` confirmed an existing user, and created a new confirmed user, before `bootstrap_family`. A re-run that the RPC refuses (`family name already exists`) left a stranger confirmed, or left a brand-new confirmed user who can request a sign-in code and whom orphan cleanup will not remove. The hosted proof only bootstrapped emails whose family create succeeded, and the Deno test only checked that `updateUserById` appeared in the file. Confirmation now runs after the RPC succeeds. A user created by this command is deleted when the RPC fails. The hosted-auth proof re-runs the same family (still one family), refuses an unrelated unconfirmed address without confirming it, and expects no auth row for an email it created and then refused.
+- **Fixed.** The ops job never ran the hosted sign-in proof. `scripts/deploy/hosted-refusal_test.sh` rejects `ops-suite.sh` if the source names the production env file, and the new reset check grepped for that name. The guards step failed, so the suite, including `bootstrap-hosted-otp.sh`, was skipped. The check now looks for a file-read error without naming that file. The proof stays the last step of the suite, which the ops job runs.
 
 ## Deviations from the plan and why
 

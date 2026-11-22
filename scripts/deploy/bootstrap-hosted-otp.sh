@@ -210,6 +210,32 @@ run_bootstrap() {
   fi
 }
 
+# --force is required. The seeded project already has members, and that
+# refusal happens before any auth user is prepared. This reaches the family
+# RPC, which is the step that must not confirm or keep a new user.
+expect_bootstrap_refused() {
+  local family="$1"
+  local email="$2"
+  local status
+  set +e
+  pnpm bootstrap:family --env test --force --family "$family" --email "$email" --label "Mom" >/tmp/boot-otp.out 2>&1
+  status=$?
+  set -e
+  if [[ "$status" -eq 0 ]]; then
+    echo "bootstrap should have refused" >&2
+    exit 1
+  fi
+  if ! grep -q 'family name already exists' /tmp/boot-otp.out; then
+    echo "bootstrap refusal was not the existing-family error" >&2
+    grep -v '@' /tmp/boot-otp.out >&2 || true
+    exit 1
+  fi
+  if grep -v 'bootstrap-family.ts' /tmp/boot-otp.out | grep -q "$email"; then
+    echo "bootstrap logged an email address" >&2
+    exit 1
+  fi
+}
+
 run_bootstrap "Hosted Repair" "hosted-repair@example.test"
 if [[ "$(local_psql -At -c "select case when email_confirmed_at is null then 'no' else 'yes' end from auth.users where email = 'hosted-repair@example.test'")" != "yes" ]]; then
   echo "bootstrap did not confirm the existing user" >&2
@@ -253,6 +279,57 @@ while time.time() < deadline:
     time.sleep(0.4)
 raise SystemExit("sign-in code did not arrive")
 PY
+
+echo "bootstrap again does not add a second family"
+run_bootstrap "Hosted Repair" "hosted-repair@example.test"
+if [[ "$(local_psql -At -c "select count(*) from public.families where name = 'Hosted Repair'")" != "1" ]]; then
+  echo "re-run created another family" >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select case when email_confirmed_at is null then 'no' else 'yes' end from auth.users where email = 'hosted-repair@example.test'")" != "yes" ]]; then
+  echo "re-run left the repaired user unconfirmed" >&2
+  exit 1
+fi
+
+OTP_EMAIL="hosted-stranger@example.test" python3 - <<'PY'
+import json, os, urllib.error, urllib.request
+body = json.dumps({
+    "email": os.environ["OTP_EMAIL"],
+    "email_confirm": False,
+    "user_metadata": {"display_name": "Mom"},
+}).encode()
+req = urllib.request.Request(
+    os.environ["OTP_API"] + "/auth/v1/admin/users",
+    data=body,
+    headers={
+        "apikey": os.environ["OTP_SECRET"],
+        "Authorization": "Bearer " + os.environ["OTP_SECRET"],
+        "Content-Type": "application/json",
+    },
+    method="POST",
+)
+try:
+    with urllib.request.urlopen(req) as res:
+        res.read()
+except urllib.error.HTTPError as caught:
+    raise SystemExit("could not prepare the stranger (HTTP %s)" % caught.code) from None
+PY
+local_psql -c "update auth.users set email_confirmed_at = null where email = 'hosted-stranger@example.test'" >/dev/null
+expect_bootstrap_refused "Hosted Repair" "hosted-stranger@example.test"
+if [[ "$(local_psql -At -c "select case when email_confirmed_at is null then 'no' else 'yes' end from auth.users where email = 'hosted-stranger@example.test'")" != "no" ]]; then
+  echo "a refused bootstrap confirmed an unrelated user" >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select count(*) from public.families where name = 'Hosted Repair'")" != "1" ]]; then
+  echo "a refused bootstrap changed the existing family" >&2
+  exit 1
+fi
+
+expect_bootstrap_refused "Hosted Repair" "hosted-orphan@example.test"
+if [[ "$(local_psql -At -c "select count(*) from auth.users where email = 'hosted-orphan@example.test'")" != "0" ]]; then
+  echo "a refused bootstrap left behind the user it had just created" >&2
+  exit 1
+fi
 
 run_bootstrap "Hosted Fresh" "hosted-fresh@example.test"
 if [[ "$(local_psql -At -c "select case when email_confirmed_at is null then 'no' else 'yes' end from auth.users where email = 'hosted-fresh@example.test'")" != "yes" ]]; then
