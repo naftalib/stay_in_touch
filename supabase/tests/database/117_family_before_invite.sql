@@ -297,35 +297,27 @@ begin
   exception
     when others then null;
   end;
-  perform pg_cancel_backend(a.pid)
-  from pg_stat_activity a
-  where a.application_name = 'lock-order-boot'
-    and a.state = 'active';
-  for i in 1..30 loop
-    exit when not exists (
-      select 1
-      from pg_stat_activity a
-      where a.application_name = 'lock-order-boot'
-        and a.state = 'active'
-    );
-    perform pg_sleep(0.1);
-  end loop;
 
   perform extensions.dblink_exec('ord_reset', 'set application_name = ''lock-order-reset''');
-  perform extensions.dblink_exec('ord_hold', 'begin');
-  perform extensions.dblink_exec(
-    'ord_hold',
-    $q$
-      do $body$
-      begin
-        perform 1
-        from public.families
-        where name = 'Lock Order Family'
-        for update;
-      end
-      $body$
-    $q$
-  );
+  begin
+    perform extensions.dblink_exec('ord_hold', 'begin');
+    perform extensions.dblink_exec(
+      'ord_hold',
+      $q$
+        do $body$
+        begin
+          perform 1
+          from public.families
+          where name = 'Lock Order Family'
+          for update;
+        end
+        $body$
+      $q$
+    );
+  exception
+    when others then
+      reset_hold_error := 'family lock ' || sqlstate || ' ' || sqlerrm;
+  end;
 
   waiter := null;
   perform extensions.dblink_send_query(
