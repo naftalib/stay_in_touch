@@ -155,7 +155,7 @@ begin
   );
 
   perform extensions.dblink_exec('ord_hold', 'set application_name = ''lock-order-hold''');
-  perform extensions.dblink_exec('ord_hold', 'set lock_timeout = ''3s''');
+  perform extensions.dblink_exec('ord_hold', 'set lock_timeout = ''15s''');
   perform extensions.dblink_exec('ord_hold', 'set deadlock_timeout = ''200ms''');
   perform extensions.dblink_exec('ord_hold', 'begin');
   perform extensions.dblink_exec(
@@ -291,6 +291,27 @@ begin
       boot_result := 'log ' || sqlerrm;
   end;
 
+  begin
+    perform *
+    from extensions.dblink_get_result('ord_boot', false) as t(done text);
+  exception
+    when others then null;
+  end;
+  perform pg_cancel_backend(a.pid)
+  from pg_stat_activity a
+  where a.application_name = 'lock-order-boot'
+    and a.state = 'active';
+  for i in 1..30 loop
+    exit when not exists (
+      select 1
+      from pg_stat_activity a
+      where a.application_name = 'lock-order-boot'
+        and a.state = 'active'
+    );
+    perform pg_sleep(0.1);
+  end loop;
+
+  perform extensions.dblink_exec('ord_reset', 'set application_name = ''lock-order-reset''');
   perform extensions.dblink_exec('ord_hold', 'begin');
   perform extensions.dblink_exec(
     'ord_hold',
@@ -312,9 +333,8 @@ begin
     $q$
       do $body$
       begin
-        perform set_config('application_name', 'lock-order-reset', false);
         perform set_config('deadlock_timeout', '200ms', true);
-        perform set_config('lock_timeout', '8s', true);
+        perform set_config('lock_timeout', '20s', true);
         begin
           insert into public.lock_order_log (kind, result)
           select 'reset', public.reset_unjoined_bootstrap_family(
@@ -332,24 +352,13 @@ begin
     $q$
   );
 
-  for i in 1..80 loop
+  for i in 1..40 loop
     select a.pid
       into waiter
     from pg_stat_activity a
     where a.application_name = 'lock-order-reset'
       and a.state = 'active'
-      and exists (
-        select 1
-        from pg_locks waiter_lock
-        join pg_locks holder_lock
-          on holder_lock.locktype = 'transactionid'
-         and holder_lock.transactionid = waiter_lock.transactionid
-         and holder_lock.granted
-         and not waiter_lock.granted
-        join pg_stat_activity holder on holder.pid = holder_lock.pid
-        where waiter_lock.pid = a.pid
-          and holder.application_name = 'lock-order-hold'
-      )
+      and a.wait_event_type = 'Lock'
     limit 1;
     exit when waiter is not null;
     perform pg_sleep(0.1);
@@ -357,13 +366,16 @@ begin
 
   if waiter is null then
     select 'no waiter ' || coalesce(string_agg(
-      a.application_name || ':' || a.state || ':'
-        || coalesce(a.wait_event_type, '') || ':' || coalesce(a.wait_event, ''),
-      ','
+      coalesce(nullif(a.application_name, ''), 'unnamed') || ':' || a.state || ':'
+        || coalesce(a.wait_event_type, '') || ':' || coalesce(a.wait_event, '')
+        || ':' || left(regexp_replace(a.query, '[[:space:]]+', ' ', 'g'), 90),
+      ' || '
     ), '')
       into reset_hold_error
     from pg_stat_activity a
-    where a.application_name like 'lock-order-%';
+    where a.application_name like 'lock-order-%'
+       or a.query ilike '%reset_unjoined_bootstrap_family%'
+       or a.query ilike '%Lock Order Family%';
   else
     reset_waiting := 1;
     select count(*)::integer
