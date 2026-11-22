@@ -74,6 +74,25 @@ begin
   limit 1
   for update;
 
+  -- The profile and email checks above ran before this lock. Read them again
+  -- before any invite row is written.
+  if p_user_id is null or not exists (
+    select 1 from public.profiles where id = p_user_id
+  ) then
+    raise exception 'auth user has no profile'
+      using errcode = '22023';
+  end if;
+
+  select private.normalized_email(u.email)
+    into user_email
+  from auth.users u
+  where u.id = p_user_id;
+
+  if user_email is distinct from normalized then
+    raise exception 'email does not match the auth user'
+      using errcode = '22023';
+  end if;
+
   if fam is not null then
     select fm.id
       into member_id
@@ -342,6 +361,13 @@ begin
      or private.normalized_email(invite.email) <> private.normalized_email(actor_email)
      or invite.family_id is distinct from peeked.family_id then
     raise exception 'invitation not found'
+      using errcode = '42501';
+  end if;
+
+  -- The peek matched this token. A resend can rotate token_hash while this
+  -- transaction waits on the family row. The locked row has to still match.
+  if invite.token_hash is distinct from private.invitation_token_hash(btrim(p_token)) then
+    raise exception 'invitation token is no longer valid'
       using errcode = '42501';
   end if;
 

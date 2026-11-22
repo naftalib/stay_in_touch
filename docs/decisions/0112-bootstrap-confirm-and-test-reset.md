@@ -32,6 +32,8 @@ Reset locks the family row before the invitation. `bootstrap_family` used to loc
 
 Those paths now lock the family row and then the invitation. The audit insert runs only after that same transaction holds the family row. A pgTAP source check requires that order in each function. A second session holds the family row, starts `bootstrap_family`, and locks the invitation while it waits. That invitation lock fails if bootstrap still takes the invite first.
 
+`accept_invitation` finds the invite by `token_hash` before that family lock. A resend (`issue_invitation_token`) can rotate the hash while accept waits. After the invitation row is locked, accept requires `token_hash` to still match the presented token and raises `invitation token is no longer valid` when it does not. Status and expiry are read from that locked row. `accept_invite`, `revoke_invitation`, and `issue_invitation_token` re-check existence, family, and status on the locked row; they do not accept a token. `bootstrap_family` re-reads the auth user's email and profile after the family lock. Reset recounts the family name while the matching family rows are locked.
+
 ## Status
 
 Accepted

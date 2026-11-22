@@ -79,6 +79,23 @@ begin
     and f.deleted_at is null
   for update;
 
+  -- The name count above ran before this lock. Count again while the
+  -- matching rows are locked.
+  select count(*)::integer
+    into name_count
+  from public.families f
+  where btrim(f.name) = btrim(p_family_name)
+    and f.deleted_at is null;
+
+  if name_count = 0 then
+    return false;
+  end if;
+
+  if name_count > 1 then
+    raise exception 'family name is not unique'
+      using errcode = '22023';
+  end if;
+
   -- Child inserts wait on the family row. Updates of the invite or space
   -- do not, so lock those rows before reading them. The invitation lock
   -- stays after the family lock; see the migration header.
