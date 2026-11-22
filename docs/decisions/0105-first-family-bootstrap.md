@@ -15,7 +15,7 @@ Hosted projects must not run `seed.sql`. The first parent has to exist before an
 The script is never a GitHub Actions step, because those logs are public. A project that already has members is refused unless `--force`.
 
 ## Refined
-ADR 0110 refines the Actions refusal. Actions may run the script against the local stack. A hosted URL is still refused. The env file must include the mail settings before any user is created, and an expired pending invite for that same email can be renewed. This file is not rewritten.
+ADR 0110 refines the Actions refusal. Actions may run the script against the local stack. A hosted URL is still refused. The env file must include the mail settings before any user is created, and an expired pending invite for that same email can be renewed. ADR 0112 confirms the bootstrap auth user at creation and adds a test-only reset for an unjoined family. This file is not rewritten.
 
 ## Status
 Accepted

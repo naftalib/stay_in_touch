@@ -158,6 +158,7 @@ This index mirrors the old table so existing links to `docs/decisions.md` still 
 | Content-Security-Policy deferred | [0109](./decisions/0109-csp-deferred.md) |
 | Bootstrap in Actions is local-only; mail settings are checked first (refines 0105) | [0110](./decisions/0110-bootstrap-local-actions-path.md) |
 | Hosted SQL uses the Supavisor session pooler (refines 0033) | [0111](./decisions/0111-session-pooler-for-hosted-sql.md) |
+| Bootstrap confirms the auth user; test-only reset of an unjoined family (refines 0060, 0105) | [0112](./decisions/0112-bootstrap-confirm-and-test-reset.md) |
 
 ## Future additions
 

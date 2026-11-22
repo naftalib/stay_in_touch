@@ -977,6 +977,10 @@ export type Database = {
           thumb_key: string;
         }[];
       };
+      reset_unjoined_bootstrap_family: {
+        Args: { p_confirm: string; p_email: string; p_family_name: string };
+        Returns: boolean;
+      };
       revoke_invitation: { Args: { p_invitation_id: string }; Returns: undefined };
       set_notifications_enabled: {
         Args: { p_enabled: boolean; p_family_id: string };

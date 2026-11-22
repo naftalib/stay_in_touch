@@ -25,3 +25,4 @@ Copy [`_template.md`](./_template.md) when starting a new entry. Keep entries sh
 | 07 | [Real push smoke test](./07-push-smoke-test.md) | 16 Nov 2026 |
 | 08 | [Go-live](./08-go-live.md) | 16 Nov 2026 |
 | 09 | [Realtime repair over the session pooler](./09-realtime-repair-fix.md) | 19 Nov 2026 |
+| 10 | [Bootstrap confirms the user, and test can start over](./10-bootstrap-confirm-fix.md) | 22 Nov 2026 |

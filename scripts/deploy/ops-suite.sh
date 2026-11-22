@@ -170,6 +170,179 @@ if [[ "$families_again" != "1" ]]; then
   exit 1
 fi
 
+echo "reset refuses production before it reads an env file"
+set +e
+pnpm bootstrap:family --env production --reset --confirm-reset --family "Ops Bootstrap" --email "ops-parent@example.test" >/tmp/boot.out 2>&1
+boot_status=$?
+set -e
+if [[ "$boot_status" -eq 0 ]]; then
+  echo "reset should have refused production" >&2
+  exit 1
+fi
+if ! grep -q 'reset is refused for production' /tmp/boot.out; then
+  echo "production reset refusal was not the production error" >&2
+  cat /tmp/boot.out >&2
+  exit 1
+fi
+if grep -q 'missing ' /tmp/boot.out; then
+  echo "production reset tried to read an env file" >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select count(*) from public.families where name = 'Ops Bootstrap'")" != "1" ]]; then
+  echo "production reset changed the family" >&2
+  exit 1
+fi
+
+echo "reset requires the confirmation flag"
+set +e
+pnpm bootstrap:family --env test --reset --family "Ops Bootstrap" --email "ops-parent@example.test" >/tmp/boot.out 2>&1
+boot_status=$?
+set -e
+if [[ "$boot_status" -eq 0 ]]; then
+  echo "reset should have required confirmation" >&2
+  exit 1
+fi
+if ! grep -q 'reset requires --confirm-reset' /tmp/boot.out; then
+  echo "reset did not name the confirmation flag" >&2
+  cat /tmp/boot.out >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select count(*) from public.families where name = 'Ops Bootstrap'")" != "1" ]]; then
+  echo "unconfirmed reset changed the family" >&2
+  exit 1
+fi
+
+echo "reset refuses a family that already has members"
+members_before="$(local_psql -At -c "select count(*) from public.family_members")"
+messages_before="$(local_psql -At -c "select count(*) from public.messages")"
+set +e
+pnpm bootstrap:family --env test --reset --confirm-reset --family "The Example Family" --email "mom@example.test" >/tmp/boot.out 2>&1
+boot_status=$?
+set -e
+if [[ "$boot_status" -eq 0 ]]; then
+  echo "reset should have refused a family with members" >&2
+  exit 1
+fi
+if ! grep -q 'this family has members' /tmp/boot.out; then
+  echo "member refusal was not reported" >&2
+  cat /tmp/boot.out >&2
+  exit 1
+fi
+if grep -v 'bootstrap-family.ts' /tmp/boot.out | grep -q 'mom@example.test'; then
+  echo "reset logged the email address" >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select count(*) from public.families where name = 'The Example Family'")" != "1" ]]; then
+  echo "member refusal removed the example family" >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select count(*) from auth.users where email = 'mom@example.test'")" != "1" ]]; then
+  echo "member refusal removed Mom" >&2
+  exit 1
+fi
+
+echo "reset refuses an email that is not the pending invite"
+set +e
+pnpm bootstrap:family --env test --reset --confirm-reset --family "Ops Bootstrap" --email "someone-else@example.test" >/tmp/boot.out 2>&1
+boot_status=$?
+set -e
+if [[ "$boot_status" -eq 0 ]]; then
+  echo "reset should have refused a different email" >&2
+  exit 1
+fi
+if ! grep -q 'this family is not an unjoined bootstrap' /tmp/boot.out; then
+  echo "email mismatch was not reported" >&2
+  cat /tmp/boot.out >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select count(*) from auth.users where email = 'ops-parent@example.test'")" != "1" ]]; then
+  echo "email mismatch removed the bootstrap user" >&2
+  exit 1
+fi
+
+echo "reset removes only the unjoined bootstrap family"
+set +e
+pnpm bootstrap:family --env test --reset --confirm-reset --family "Ops Bootstrap" --email "ops-parent@example.test" >/tmp/boot.out 2>&1
+boot_status=$?
+set -e
+if [[ "$boot_status" -ne 0 ]]; then
+  echo "reset failed" >&2
+  cat /tmp/boot.out >&2
+  exit 1
+fi
+if ! grep -q 'test family removed' /tmp/boot.out; then
+  echo "reset did not report removal" >&2
+  cat /tmp/boot.out >&2
+  exit 1
+fi
+if grep -v 'bootstrap-family.ts' /tmp/boot.out | grep -q 'ops-parent@example.test'; then
+  echo "reset logged the email address" >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select count(*) from public.families where name = 'Ops Bootstrap'")" != "0" ]]; then
+  echo "reset left the bootstrap family" >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select count(*) from auth.users where email = 'ops-parent@example.test'")" != "0" ]]; then
+  echo "reset left the bootstrap auth user" >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select count(*) from public.families where name = 'The Example Family'")" != "1" ]]; then
+  echo "reset removed the example family" >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select count(*) from public.family_members")" != "$members_before" ]]; then
+  echo "reset changed family memberships" >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select count(*) from public.messages")" != "$messages_before" ]]; then
+  echo "reset changed messages" >&2
+  exit 1
+fi
+
+echo "reset again does nothing"
+set +e
+pnpm bootstrap:family --env test --reset --confirm-reset --family "Ops Bootstrap" --email "ops-parent@example.test" >/tmp/boot.out 2>&1
+boot_status=$?
+set -e
+if [[ "$boot_status" -ne 0 ]]; then
+  echo "second reset failed" >&2
+  cat /tmp/boot.out >&2
+  exit 1
+fi
+if ! grep -q 'nothing to reset' /tmp/boot.out; then
+  echo "a second reset was not a no-op" >&2
+  cat /tmp/boot.out >&2
+  exit 1
+fi
+
+echo "bootstrap after reset can use a different email"
+set +e
+GITHUB_ACTIONS=true pnpm bootstrap:family --env test --force --family "Ops Bootstrap" --email "ops-parent-2@example.test" --label "Mom" >/tmp/boot.out 2>&1
+boot_status=$?
+set -e
+if [[ "$boot_status" -ne 0 ]]; then
+  echo "bootstrap after reset failed" >&2
+  cat /tmp/boot.out >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select count(*) from public.families where name = 'Ops Bootstrap'")" != "1" ]]; then
+  echo "bootstrap after reset did not create one family" >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select count(*) from auth.users where email = 'ops-parent-2@example.test'")" != "1" ]]; then
+  echo "bootstrap after reset did not create the new user" >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select email_confirmed_at is not null from auth.users where email = 'ops-parent-2@example.test'")" != "t" ]]; then
+  echo "bootstrap left the new user unconfirmed" >&2
+  exit 1
+fi
+if [[ "$(local_psql -At -c "select count(*) from auth.users where email = 'ops-parent@example.test'")" != "0" ]]; then
+  echo "the removed bootstrap user came back" >&2
+  exit 1
+fi
+
 echo "storage fixtures"
 local_psql -c "update private.app_limits set photo_storage_cap_bytes = (select ceil(greatest(coalesce(sum(case when status = 'ready' then coalesce(size_bytes, 0) + coalesce(expected_thumb_bytes, 0) when status = 'pending' then coalesce(expected_bytes, 0) + coalesce(expected_thumb_bytes, 0) else 0 end), 0), 1) / 0.79)::bigint from public.media);"
 if ! bash "$REPO_ROOT/scripts/storage-check.sh" local >/tmp/storage79.out; then
@@ -268,4 +441,8 @@ if ! grep -q -- '--i-mean-production' /tmp/restore-prod.out; then
 fi
 
 rm -rf "$identity_dir"
+
+echo "hosted auth confirmations: bootstrap, repair, and sign-in code"
+bash "$REPO_ROOT/scripts/deploy/bootstrap-hosted-otp.sh"
+
 echo "ops suite passed"

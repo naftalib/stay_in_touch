@@ -4,17 +4,23 @@
  * GitHub Actions when the project URL is not the local stack.
  *
  * pnpm bootstrap:family --env test|production --family "The Breuning Family" --email person@example.test --label "Mom"
+ *
+ * Test only, to remove an unjoined family and bootstrap a different address:
+ * pnpm bootstrap:family --env test --reset --confirm-reset --family "Test Family" --email person@example.test
  */
 import {
   createClient,
   type SupabaseClient,
+  type User,
 } from "npm:@supabase/supabase-js@2.119.0";
 import { sendEmail } from "../supabase/functions/_shared/email.ts";
 import { buildInviteUrl } from "../supabase/functions/_shared/inviteLink.ts";
 import { buildInviteEmail } from "../supabase/functions/_shared/templates/invite.ts";
 import {
+  assertActionsTargetAllowed,
   assertEnvFileAllowed,
   assertReadyToBootstrap,
+  assertResetAllowed,
   type BootstrapArgs,
   envFilePath,
   loadEnvFile,
@@ -24,6 +30,7 @@ import {
 export {
   assertEnvFileAllowed,
   assertReadyToBootstrap,
+  assertResetAllowed,
   type BootstrapArgs,
   envFilePath,
   loadEnvFile,
@@ -36,17 +43,70 @@ function applyEnv(vars: Record<string, string>): void {
   }
 }
 
+async function findUserByEmail(
+  admin: SupabaseClient,
+  email: string,
+): Promise<User | null> {
+  for (let page = 1; page <= 20; page++) {
+    const listed = await admin.auth.admin.listUsers({ page, perPage: 200 });
+    if (listed.error) throw new Error("could not look up the auth user");
+    const match = listed.data.users.find((user) =>
+      user.email?.toLowerCase() === email.toLowerCase()
+    );
+    if (match?.id) return match;
+    if (listed.data.users.length < 200) break;
+  }
+  return null;
+}
+
+async function confirmUser(
+  admin: SupabaseClient,
+  userId: string,
+): Promise<void> {
+  const updated = await admin.auth.admin.updateUserById(userId, {
+    email_confirm: true,
+  });
+  if (updated.error) throw new Error("could not confirm the auth user");
+}
+
+type PreparedUser = {
+  id: string;
+  created: boolean;
+  needsConfirm: boolean;
+};
+
+/**
+ * Public signup is closed. GoTrue treats an unconfirmed address as a signup,
+ * so the invite code returns signup_disabled unless the user is confirmed
+ * (ADR 0060, ADR 0112). Confirmation of an existing user waits until
+ * bootstrap_family succeeds, so a refused re-run does not confirm a stranger.
+ */
 async function findOrCreateUser(
   admin: SupabaseClient,
   email: string,
   label: string,
-): Promise<string> {
+): Promise<PreparedUser> {
+  const existing = await findUserByEmail(admin, email);
+  if (existing?.id) {
+    return {
+      id: existing.id,
+      created: false,
+      needsConfirm: !existing.email_confirmed_at,
+    };
+  }
+
   const created = await admin.auth.admin.createUser({
     email,
-    email_confirm: false,
+    email_confirm: true,
     user_metadata: { display_name: label },
   });
-  if (!created.error && created.data.user?.id) return created.data.user.id;
+  if (!created.error && created.data.user?.id) {
+    return {
+      id: created.data.user.id,
+      created: true,
+      needsConfirm: !created.data.user.email_confirmed_at,
+    };
+  }
 
   const message = created.error?.message.toLowerCase() ?? "";
   const exists = message.includes("already") ||
@@ -56,22 +116,64 @@ async function findOrCreateUser(
     throw new Error("could not create the auth user");
   }
 
-  for (let page = 1; page <= 20; page++) {
-    const listed = await admin.auth.admin.listUsers({ page, perPage: 200 });
-    if (listed.error) throw new Error("could not look up the auth user");
-    const match = listed.data.users.find((user) =>
-      user.email?.toLowerCase() === email.toLowerCase()
-    );
-    if (match?.id) return match.id;
-    if (listed.data.users.length < 200) break;
+  const match = await findUserByEmail(admin, email);
+  if (!match?.id) throw new Error("could not find the auth user");
+  return {
+    id: match.id,
+    created: false,
+    needsConfirm: !match.email_confirmed_at,
+  };
+}
+
+async function runReset(args: BootstrapArgs, root: string): Promise<void> {
+  assertResetAllowed(args);
+  const path = envFilePath(args.envName, root);
+  await assertEnvFileAllowed(path);
+  let text: string;
+  try {
+    text = await Deno.readTextFile(path);
+  } catch {
+    throw new Error(`missing ${path}`);
   }
-  throw new Error("could not find the auth user");
+  const vars = loadEnvFile(text);
+  const url = vars.SUPABASE_URL ?? "";
+  const secret = vars.SUPABASE_SECRET_KEY ?? "";
+  if (!url.trim() || !secret.trim()) {
+    throw new Error("env file must set SUPABASE_URL and SUPABASE_SECRET_KEY");
+  }
+  assertActionsTargetAllowed(url);
+
+  const admin = createClient(url, secret, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await admin.rpc("reset_unjoined_bootstrap_family", {
+    p_family_name: args.family,
+    p_email: args.email,
+    p_confirm: "confirm-reset",
+  });
+  if (error) {
+    const detail = error.message.replace(/[\r\n]+/g, " ").slice(0, 240);
+    throw new Error(detail ? `reset failed: ${detail}` : "reset failed");
+  }
+  const removed = data === true ||
+    (Array.isArray(data) && data.length === 1 && data[0] === true);
+  const absent = data === false ||
+    (Array.isArray(data) && data.length === 1 && data[0] === false);
+  if (!removed && !absent) throw new Error("reset failed");
+  console.log(removed ? "test family removed" : "nothing to reset");
 }
 
 export async function runBootstrap(
   args: BootstrapArgs,
   root = Deno.cwd(),
 ): Promise<void> {
+  // Reset never reads a production env file and never creates a user.
+  assertResetAllowed(args);
+  if (args.reset) {
+    await runReset(args, root);
+    return;
+  }
+
   const path = envFilePath(args.envName, root);
   await assertEnvFileAllowed(path);
   let text: string;
@@ -105,51 +207,63 @@ export async function runBootstrap(
     }
   }
 
-  const userId = await findOrCreateUser(admin, args.email, args.label);
-  const { data, error } = await admin.rpc("bootstrap_family", {
-    p_user_id: userId,
-    p_family_name: args.family,
-    p_email: args.email,
-    p_label: args.label,
-  });
-  if (error) {
-    const detail = error.message.replace(/[\r\n]+/g, " ").slice(0, 240);
-    throw new Error(
-      detail ? `bootstrap_family failed: ${detail}` : "bootstrap_family failed",
-    );
-  }
-  const row = (Array.isArray(data) ? data[0] : data) as {
-    token?: string | null;
-    reused?: boolean;
-  } | null;
-  if (!row) throw new Error("bootstrap_family returned nothing");
+  const prepared = await findOrCreateUser(admin, args.email, args.label);
+  let bootstrapped = false;
+  try {
+    const { data, error } = await admin.rpc("bootstrap_family", {
+      p_user_id: prepared.id,
+      p_family_name: args.family,
+      p_email: args.email,
+      p_label: args.label,
+    });
+    if (error) {
+      const detail = error.message.replace(/[\r\n]+/g, " ").slice(0, 240);
+      throw new Error(
+        detail
+          ? `bootstrap_family failed: ${detail}`
+          : "bootstrap_family failed",
+      );
+    }
+    bootstrapped = true;
+    if (prepared.needsConfirm) await confirmUser(admin, prepared.id);
+    const row = (Array.isArray(data) ? data[0] : data) as {
+      token?: string | null;
+      reused?: boolean;
+    } | null;
+    if (!row) throw new Error("bootstrap_family returned nothing");
 
-  if (!row.token) {
-    console.log(
-      row.reused
-        ? "family already has this admin; nothing sent"
-        : "no invite token",
-    );
-    return;
-  }
+    if (!row.token) {
+      console.log(
+        row.reused
+          ? "family already has this admin; nothing sent"
+          : "no invite token",
+      );
+      return;
+    }
 
-  const appUrl = Deno.env.get("APP_URL");
-  if (!appUrl) throw new Error("APP_URL is not set");
-  const inviteUrl = buildInviteUrl(appUrl, row.token);
-  const mail = buildInviteEmail({
-    familyName: args.family,
-    inviterName: args.label,
-    label: args.label,
-    inviteUrl,
-    expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-  });
-  await sendEmail({
-    to: args.email,
-    subject: mail.subject,
-    html: mail.html,
-    text: mail.text,
-  });
-  console.log(row.reused ? "invite sent again" : "family ready; invite sent");
+    const appUrl = Deno.env.get("APP_URL");
+    if (!appUrl) throw new Error("APP_URL is not set");
+    const inviteUrl = buildInviteUrl(appUrl, row.token);
+    const mail = buildInviteEmail({
+      familyName: args.family,
+      inviterName: args.label,
+      label: args.label,
+      inviteUrl,
+      expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+    });
+    await sendEmail({
+      to: args.email,
+      subject: mail.subject,
+      html: mail.html,
+      text: mail.text,
+    });
+    console.log(row.reused ? "invite sent again" : "family ready; invite sent");
+  } catch (caught) {
+    if (prepared.created && !bootstrapped) {
+      await admin.auth.admin.deleteUser(prepared.id);
+    }
+    throw caught;
+  }
 }
 
 async function main(): Promise<void> {

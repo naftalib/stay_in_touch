@@ -24,7 +24,7 @@ Create an API token with Workers Scripts Edit. Note the account id. The test Wor
 
 ## 3. [Naftali] Gmail
 
-Create or choose a Gmail account. Turn on 2-step verification. Create an app password. The same account may send for both projects. Test can use plus-addresses (`you+test@gmail.com`).
+Create or choose a Gmail account. Turn on 2-step verification. Create an app password. The same account may send for both projects. Test invites can use a plus-address of an inbox you read. `breuningapp+mom@gmail.com` arrives in `breuningapp@gmail.com`. Do not send mail to an address you do not read.
 
 Gmail's free limit is roughly 100 to 500 messages a day, and mail may arrive in spam. On the test project, send one invite to your own address first. Tell the family to check spam and to mark the message "not spam".
 
@@ -91,7 +91,9 @@ The repair now uses the Supavisor session pooler, which is IPv4. The host is the
 
 ## 7. [Naftali] Bootstrap a test family
 
-On your computer, not in Actions. GitHub's copy of the Gmail password is not available here, so the gitignored env file has to carry the mail settings. The command checks them before it creates the user or the family. If the first invite expires before you accept it, run the same command again. It renews that invite.
+On your computer, not in Actions. GitHub's copy of the Gmail password is not available here, so the gitignored env file has to carry the mail settings. The command checks them before it creates the user or the family. If the first invite expires before you accept it, run the same command again. It renews that invite and, if that user was left unconfirmed, confirms them so the sign-in code can be sent.
+
+The address has to be an inbox you read. Use a plus-address of that inbox. `<your-gmail>+mom@gmail.com` means: take the part before `@` in the Gmail account you read, add `+mom`, and keep `@gmail.com`. For `breuningapp@gmail.com`, that is `breuningapp+mom@gmail.com`, and the message arrives in the breuningapp mailbox. Do not use `you+test@gmail.com`. That is a stranger's inbox.
 
 ```bash
 # .env.test.local is gitignored. Never commit it.
@@ -104,12 +106,30 @@ GMAIL_SMTP_USER=<the Gmail address>
 GMAIL_SMTP_PASS=<the app password>
 EMAIL_FROM=Stay In Touch <the Gmail address>
 EOF
-pnpm bootstrap:family --env test --family "Test Family" --email "you+test@gmail.com" --label "Mom"
+pnpm bootstrap:family --env test --family "Test Family" --email "<your-gmail>+mom@gmail.com" --label "Mom"
 ```
 
 `GMAIL_SMTP_HOST` and `GMAIL_SMTP_PORT` can be omitted. They default to `smtp.gmail.com` and `465`.
 
 Open the invite from Gmail, accept it, and confirm you are an admin with a General space and a space titled Mom. Run the command again. It must not create a second family.
+
+### If test was bootstrapped to you+test@gmail.com
+
+The test project already has "Test Family" pointing at `you+test@gmail.com`. Nobody you know reads that mailbox, so the sign-in code cannot be completed there. Reset deletes that unjoined family, its General space, its pending invite, and the auth user created for that invite. It does not delete any other family. It refuses `--env production` even with `--confirm-reset`. Without `--confirm-reset` it deletes nothing.
+
+PowerShell, from the repo directory, using the `.env.test.local` you already created:
+
+```powershell
+pnpm bootstrap:family --env test --reset --confirm-reset --family "Test Family" --email "you+test@gmail.com"
+```
+
+The success line is `test family removed`. Then bootstrap again with your own address. For the breuningapp mailbox, the email argument is `breuningapp+mom@gmail.com`.
+
+```powershell
+pnpm bootstrap:family --env test --family "Test Family" --email "<your-gmail>+mom@gmail.com" --label "Mom"
+```
+
+If the invite is already on an address you read and the code request failed, skip the reset. Run the bootstrap command again with that same address. The re-run confirms the existing user and sends the invite again.
 
 ## 8. [Naftali] Phone tests
 
