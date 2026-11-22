@@ -121,7 +121,16 @@ begin
   perform extensions.dblink_exec(
     'stale_hold',
     format(
-      $q$do $body$ begin perform 1 from public.families where id = %L for update; end $body$$q$,
+      $q$
+        do $body$
+        begin
+          perform 1
+          from public.families
+          where id = %L
+          for update;
+        end
+        $body$
+      $q$,
       fam
     )
   );
