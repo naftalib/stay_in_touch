@@ -45,3 +45,7 @@ https://github.com/naftalib/stay_in_touch/pull/10
 
 - Naftali still has to run the PowerShell reset and bootstrap against the hosted test project. This handoff does not call that project.
 - Items still open from build log 09 are unchanged, including the test-project deploy re-run and the phone checks.
+
+## Follow-up
+
+- **Fixed.** `private.reset_unjoined_bootstrap_family` locked the family row and then the invite. `bootstrap_family` and `accept_invitation` locked the invite and then inserted a row that needs the family (`audit_log`, or `family_members` inside `finish_accept_invitation`). Each side could wait for the other's lock. The same order was in `accept_invite`, `revoke_invitation`, and `issue_invitation_token`. pgTAP runs each call in one transaction, so the two orders never overlapped, and no test compared them. Reset keeps family-then-invite. The other five functions now take the family row before the invitation. `117_family_before_invite.sql` requires that order in the function bodies. It also holds the family row in a second session, starts bootstrap and reset, and locks the invitation while they wait. That lock is the one the old order deadlocks on.

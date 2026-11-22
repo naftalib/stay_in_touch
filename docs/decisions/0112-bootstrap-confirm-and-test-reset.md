@@ -26,6 +26,12 @@ Changing the invite email was the smaller patch, and it was rejected. The hosted
 
 A re-run against an unconfirmed bootstrap user confirms that user and sends the invite again. It does not create a second family. A re-run that `bootstrap_family` refuses leaves an unrelated unconfirmed user unconfirmed, and it does not keep an auth user the command had just created. Reset does not send mail and does not require the Gmail settings. It still refuses a hosted URL when `GITHUB_ACTIONS` is set. Local Auth stays confirmations-off. The ops job temporarily starts Auth with signup off and confirmations on, runs bootstrap, and expects `signInWithOtp` (`create_user: false`) to return 200 and Mailpit to receive the code. It also expects the unconfirmed user to get `signup_disabled` until bootstrap confirms them. That proof is the last step of `scripts/deploy/ops-suite.sh`, which the ops CI job runs. The suite must not name the production env file; the refusal test rejects the source if it does.
 
+## Refinement
+
+Reset locks the family row before the invitation. `bootstrap_family` used to lock the pending invite and then insert `audit_log`, which takes `FOR KEY SHARE` on the family. `accept_invitation` did the same, and so did `accept_invite`, `revoke_invitation`, and `issue_invitation_token`. If reset held the family and waited for the invite while one of those held the invite and waited for the family, PostgreSQL cancelled one of them.
+
+Those paths now lock the family row and then the invitation. The audit insert runs only after that same transaction holds the family row. A pgTAP source check requires that order in each function. A second session holds the family row, starts bootstrap and then reset, and locks the invitation while they wait. That invitation lock fails if either function still takes the invite first.
+
 ## Status
 
 Accepted

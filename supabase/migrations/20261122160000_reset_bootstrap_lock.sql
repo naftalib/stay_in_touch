@@ -1,7 +1,12 @@
 -- Hold row locks across the reset so a sign-in or an invite update cannot
--- land after the checks and before the deletes. The auth user row stays
--- locked from the sign-in read through the delete. The delete itself also
--- refuses a row that has since signed in or gained a session.
+-- land after the checks and before the deletes. Lock order is the family
+-- row, then its invitations, then its spaces, then the auth user.
+-- bootstrap_family, accept_invitation, accept_invite, revoke_invitation,
+-- and issue_invitation_token take that same family lock before the
+-- invitation. An audit insert needs the family row, so the opposite order
+-- deadlocks. The auth user row stays locked from the sign-in read through
+-- the delete. The delete itself also refuses a row that has since signed
+-- in or gained a session.
 
 create or replace function private.reset_unjoined_bootstrap_family(
   p_family_name text,
@@ -66,6 +71,7 @@ begin
       using errcode = '22023';
   end if;
 
+  -- lock-order: family
   select f.id, f.created_by
     into fam, creator
   from public.families f
@@ -74,7 +80,9 @@ begin
   for update;
 
   -- Child inserts wait on the family row. Updates of the invite or space
-  -- do not, so lock those rows before reading them.
+  -- do not, so lock those rows before reading them. The invitation lock
+  -- stays after the family lock; see the migration header.
+  -- lock-order: invitation
   perform 1
   from public.invitations i
   where i.family_id = fam
