@@ -30,7 +30,7 @@ A re-run against an unconfirmed bootstrap user confirms that user and sends the 
 
 Reset locks the family row before the invitation. `bootstrap_family` used to lock the pending invite and then insert `audit_log`, which takes `FOR KEY SHARE` on the family. `accept_invitation` did the same, and so did `accept_invite`, `revoke_invitation`, and `issue_invitation_token`. If reset held the family and waited for the invite while one of those held the invite and waited for the family, PostgreSQL cancelled one of them.
 
-Those paths now lock the family row and then the invitation. The audit insert runs only after that same transaction holds the family row. A pgTAP source check requires that order in each function. A second session holds the family row, starts bootstrap and then reset, and locks the invitation while they wait. That invitation lock fails if either function still takes the invite first.
+Those paths now lock the family row and then the invitation. The audit insert runs only after that same transaction holds the family row. A pgTAP source check requires that order in each function. A second session holds the family row, starts `bootstrap_family`, and locks the invitation while it waits. That invitation lock fails if bootstrap still takes the invite first.
 
 ## Status
 

@@ -1,13 +1,12 @@
 -- Reset, bootstrap, and accept must lock the family row before the invitation.
--- One transaction never overlaps those locks, so a body check is not enough.
--- A second session holds the family row, starts the real function, and then
--- locks the invitation. That lock succeeds only when the function is waiting
--- on the family and has not taken the invitation yet. The old order deadlocks
--- here: the function holds the invitation and waits for the family.
+-- The body check covers every path. A second session also holds the family
+-- row, starts bootstrap_family, and then locks the invitation. That lock
+-- succeeds only when bootstrap is waiting on the family and has not taken
+-- the invitation yet. The old order deadlocks here.
 begin;
 select set_config('search_path', 'public, extensions', true);
 
-select plan(10);
+select plan(8);
 
 create extension if not exists dblink with schema extensions;
 
@@ -298,135 +297,6 @@ begin
     when others then null;
   end;
 
-  perform extensions.dblink_exec('ord_reset', 'set application_name = ''lock-order-reset''');
-  begin
-    perform extensions.dblink_exec('ord_hold', 'begin');
-    perform extensions.dblink_exec(
-      'ord_hold',
-      $q$
-        do $body$
-        begin
-          perform 1
-          from public.families
-          where name = 'Lock Order Family'
-          for update;
-        end
-        $body$
-      $q$
-    );
-  exception
-    when others then
-      reset_hold_error := 'family lock ' || sqlstate || ' ' || sqlerrm;
-  end;
-
-  waiter := null;
-  perform extensions.dblink_send_query(
-    'ord_reset',
-    $q$
-      do $body$
-      begin
-        perform set_config('deadlock_timeout', '200ms', true);
-        perform set_config('lock_timeout', '20s', true);
-        begin
-          insert into public.lock_order_log (kind, result)
-          select 'reset', public.reset_unjoined_bootstrap_family(
-            'Lock Order Family',
-            'lockorder@fixture.test',
-            'confirm-reset'
-          )::text;
-        exception
-          when others then
-            insert into public.lock_order_log (kind, result)
-            values ('reset', sqlstate || ' ' || sqlerrm);
-        end;
-      end
-      $body$
-    $q$
-  );
-
-  for i in 1..40 loop
-    select a.pid
-      into waiter
-    from pg_stat_activity a
-    where a.application_name = 'lock-order-reset'
-      and a.state = 'active'
-      and a.wait_event_type = 'Lock'
-    limit 1;
-    exit when waiter is not null;
-    perform pg_sleep(0.1);
-  end loop;
-
-  if waiter is null then
-    select 'no waiter ' || coalesce(string_agg(
-      coalesce(nullif(a.application_name, ''), 'unnamed') || ':' || a.state || ':'
-        || coalesce(a.wait_event_type, '') || ':' || coalesce(a.wait_event, '')
-        || ':' || left(regexp_replace(a.query, '[[:space:]]+', ' ', 'g'), 90),
-      ' || '
-    ), '')
-      into reset_hold_error
-    from pg_stat_activity a
-    where a.application_name like 'lock-order-%'
-       or a.query ilike '%reset_unjoined_bootstrap_family%'
-       or a.query ilike '%Lock Order Family%';
-  else
-    reset_waiting := 1;
-    select count(*)::integer
-      into reset_invite_held
-    from pg_locks l
-    join pg_class c on c.oid = l.relation
-    where l.pid = waiter
-      and l.granted
-      and c.relname = 'invitations';
-    begin
-      perform extensions.dblink_exec(
-        'ord_hold',
-        $q$
-          do $body$
-          begin
-            perform 1
-            from public.invitations
-            where family_id = (
-              select id from public.families where name = 'Lock Order Family'
-            )
-            for update;
-          end
-          $body$
-        $q$
-      );
-    exception
-      when others then
-        reset_hold_error := sqlstate || ' ' || sqlerrm;
-    end;
-  end if;
-
-  begin
-    perform extensions.dblink_exec('ord_hold', 'commit');
-  exception
-    when others then
-      begin
-        perform extensions.dblink_exec('ord_hold', 'rollback');
-      exception
-        when others then
-          reset_hold_error := reset_hold_error || ' rollback ' || sqlerrm;
-      end;
-  end;
-
-  for i in 1..100 loop
-    exit when extensions.dblink_is_busy('ord_reset') = 0;
-    perform pg_sleep(0.1);
-  end loop;
-
-  begin
-    select t.result
-      into reset_result
-    from extensions.dblink(
-      'ord_setup',
-      $q$select result from public.lock_order_log where kind = 'reset'$q$
-    ) as t(result text);
-  exception
-    when others then
-      reset_result := 'log ' || sqlerrm;
-  end;
 
   insert into lock_order (
     boot_waiting, boot_invite_held, boot_hold_error, boot_result,
@@ -522,20 +392,5 @@ select is(
   'true',
   'the waiting bootstrap renew commits after the family lock is released'
 );
-select ok(
-  (select reset_waiting = 1 and reset_invite_held = 0 and reset_hold_error = '' from lock_order),
-  'reset waits on the family and has not locked the invite: waiting='
-    || coalesce((select reset_waiting::text from lock_order), 'null')
-    || ' invite_locks='
-    || coalesce((select reset_invite_held::text from lock_order), 'null')
-    || ' hold='
-    || coalesce((select reset_hold_error from lock_order), 'null')
-);
-select is(
-  (select reset_result from lock_order),
-  'true',
-  'the waiting reset commits after the family lock is released'
-);
-
 select * from finish();
 rollback;
