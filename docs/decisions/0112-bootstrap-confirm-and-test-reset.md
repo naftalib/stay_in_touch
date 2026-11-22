@@ -1,0 +1,35 @@
+# Bootstrap confirms the auth user, and test can reset an unjoined family
+
+## Context
+
+`pnpm bootstrap:family` created the first parent with `email_confirm: false`. Public signup is off on the hosted projects. GoTrue treats an unconfirmed address as a signup, so "Email me a sign-in code" returns HTTP 422 `signup_disabled` and no code is sent. ADR 0060 fixed that for `invite-send`. Bootstrap was never aligned. Local `config.toml` has email confirmations off, and the remotes have them on (ADR 0103), so CI did not run the hosted Auth shape.
+
+The first hosted test run also sent "Test Family" to `you+test@gmail.com`, which is not an inbox this family reads. The family name already exists, and bootstrap refuses a different email for that name. The test project needs a way to start over.
+
+## Options considered
+
+- Leave the user unconfirmed and turn public signup on. Anyone could create an account.
+- Change the pending invite's email in place, and only when the family has no accepted member. That keeps the family row, leaves the stranger's auth user in the project, and special-cases the rule that a different email cannot take the family name.
+- Delete the unjoined bootstrap family and the auth user created for it, then bootstrap again with a different address. Refuse production, require an explicit confirmation flag, and refuse any family that is no longer the single pending invite plus the General space.
+
+## Decision
+
+Option 3, plus the ADR 0060 confirmation rule.
+
+`bootstrap:family` calls `auth.admin.createUser` with `email_confirm: true`. If that user already exists and `email_confirmed_at` is null, it calls `auth.admin.updateUserById` with `email_confirm: true`. It still does not create a second family for the same name and email.
+
+Reset is `pnpm bootstrap:family --env test --reset --confirm-reset --family "..." --email "..."`. `--env production` is refused before the env file is read, including when `--confirm-reset` is present. `--force` cannot be combined with `--reset`. The script then calls `public.reset_unjoined_bootstrap_family`, which is `service_role` only and requires the confirmation text `confirm-reset`. One transaction deletes that family's audit rows, invite, General space, and family row, then deletes the auth user. A missing family is a no-op. A family with a member, content, a sign-in, another invite, or an auth user that is referenced anywhere else is left untouched. The database function cannot tell the test project from production, so the CLI is the production lock.
+
+Changing the invite email was the smaller patch, and it was rejected. The hosted family points at a stranger. Replacing the address would keep that auth user and would weaken the "different email cannot take the name" rule. Reset removes the bootstrap rows and lets the same command create the family again for an inbox Naftali reads.
+
+## Consequences
+
+A re-run against an unconfirmed bootstrap user confirms that user and sends the invite again. It does not create a second family. Reset does not send mail and does not require the Gmail settings. It still refuses a hosted URL when `GITHUB_ACTIONS` is set. Local Auth stays confirmations-off. The ops job temporarily starts Auth with signup off and confirmations on, runs bootstrap, and expects `signInWithOtp` (`create_user: false`) to return 200 and Mailpit to receive the code. It also expects the unconfirmed user to get `signup_disabled` until bootstrap confirms them.
+
+## Status
+
+Accepted
+
+## Date
+
+2026-11-22

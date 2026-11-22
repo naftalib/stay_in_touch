@@ -9,15 +9,48 @@ export type BootstrapArgs = {
   email: string;
   label: string;
   force: boolean;
+  reset: boolean;
+  confirmReset: boolean;
 };
+
+/**
+ * Reset is test-only. Production is refused before the env file is read.
+ * `--confirm-reset` is required. `--force` does not widen a reset.
+ */
+export function assertResetAllowed(args: BootstrapArgs): void {
+  if (args.confirmReset && !args.reset) {
+    throw new Error("--confirm-reset is only valid with --reset");
+  }
+  if (!args.reset) return;
+  // Production is refused before --force or a missing confirmation flag.
+  if (args.envName !== "test") {
+    throw new Error("reset is refused for production");
+  }
+  if (args.force) {
+    throw new Error("reset does not take --force");
+  }
+  if (!args.confirmReset) {
+    throw new Error("reset requires --confirm-reset");
+  }
+}
 
 export function parseArgs(argv: string[]): BootstrapArgs {
   const values = new Map<string, string>();
   let force = false;
+  let reset = false;
+  let confirmReset = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--force") {
       force = true;
+      continue;
+    }
+    if (arg === "--reset") {
+      reset = true;
+      continue;
+    }
+    if (arg === "--confirm-reset") {
+      confirmReset = true;
       continue;
     }
     if (arg.startsWith("--")) {
@@ -37,16 +70,27 @@ export function parseArgs(argv: string[]): BootstrapArgs {
   if (envName !== "test" && envName !== "production") {
     throw new Error("--env must be test or production");
   }
-  if (!family.trim() || !email.trim() || !label.trim()) {
-    throw new Error("--family, --email, and --label are required");
-  }
-  return {
+  const args: BootstrapArgs = {
     envName,
     family: family.trim(),
     email: email.trim(),
     label: label.trim(),
     force,
+    reset,
+    confirmReset,
   };
+  // Production reset is refused even when the family and email were omitted.
+  assertResetAllowed(args);
+  if (args.reset) {
+    if (!args.family || !args.email) {
+      throw new Error("--family and --email are required");
+    }
+    return args;
+  }
+  if (!args.family || !args.email || !args.label) {
+    throw new Error("--family, --email, and --label are required");
+  }
+  return args;
 }
 
 export function envFilePath(envName: string, root = Deno.cwd()): string {

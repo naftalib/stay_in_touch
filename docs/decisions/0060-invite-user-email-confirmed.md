@@ -26,4 +26,4 @@ Option 3. `invite-send` calls `auth.admin.createUser` with `email_confirm: true`
 
 ## Consequences
 
-An admin-typed address becomes a confirmed auth user as soon as the email is sent, even if the person never accepts. They cannot join until they prove inbox access and the token is still pending. Orphan cleanup still skips anyone who has signed in. Hosted projects should keep public signup disabled.
+An admin-typed address becomes a confirmed auth user as soon as the email is sent, even if the person never accepts. They cannot join until they prove inbox access and the token is still pending. Orphan cleanup still skips anyone who has signed in. Hosted projects should keep public signup disabled. ADR 0112 applies the same confirmation to `bootstrap:family`, including a re-run that confirms an existing unconfirmed user.

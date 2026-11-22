@@ -22,7 +22,103 @@ Deno.test("bootstrap args require env, family, email, and label", () => {
   ]);
   assertEquals(args.envName, "test");
   assertEquals(args.force, true);
+  assertEquals(args.reset, false);
+  assertEquals(args.confirmReset, false);
   assertEquals(args.family, "The Breuning Family");
+});
+
+Deno.test("reset is refused for production before other flags are accepted", () => {
+  for (const argv of [
+    ["--env", "production", "--reset"],
+    ["--env", "production", "--reset", "--confirm-reset"],
+    ["--env", "production", "--reset", "--confirm-reset", "--force"],
+    ["--env", "production", "--reset", "--confirm-reset", "--family", "Test Family"],
+  ]) {
+    try {
+      parseArgs(argv);
+      throw new Error("expected production refusal");
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "";
+      assertEquals(message, "reset is refused for production");
+    }
+  }
+});
+
+Deno.test("reset requires confirmation and does not take force", () => {
+  try {
+    parseArgs([
+      "--env",
+      "test",
+      "--reset",
+      "--family",
+      "Test Family",
+      "--email",
+      "mom@example.test",
+    ]);
+    throw new Error("expected confirmation refusal");
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "";
+    assertEquals(message, "reset requires --confirm-reset");
+  }
+  try {
+    parseArgs([
+      "--env",
+      "test",
+      "--reset",
+      "--confirm-reset",
+      "--force",
+      "--family",
+      "Test Family",
+      "--email",
+      "mom@example.test",
+    ]);
+    throw new Error("expected force refusal");
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "";
+    assertEquals(message, "reset does not take --force");
+  }
+  try {
+    parseArgs([
+      "--env",
+      "test",
+      "--confirm-reset",
+      "--family",
+      "Test Family",
+      "--email",
+      "mom@example.test",
+      "--label",
+      "Mom",
+    ]);
+    throw new Error("expected flag refusal");
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "";
+    assertEquals(message, "--confirm-reset is only valid with --reset");
+  }
+});
+
+Deno.test("reset names the family and email and does not require a label", () => {
+  const args = parseArgs([
+    "--env",
+    "test",
+    "--reset",
+    "--confirm-reset",
+    "--family",
+    "Test Family",
+    "--email",
+    "mom@example.test",
+  ]);
+  assertEquals(args.reset, true);
+  assertEquals(args.confirmReset, true);
+  assertEquals(args.force, false);
+  assertEquals(args.label, "");
+  assertEquals(args.family, "Test Family");
+  try {
+    parseArgs(["--env", "test", "--reset", "--confirm-reset", "--family", "Test Family"]);
+    throw new Error("expected email refusal");
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "";
+    assertEquals(message, "--family and --email are required");
+  }
 });
 
 Deno.test("bootstrap rejects a bad env name", () => {
@@ -146,10 +242,17 @@ Deno.test("bootstrap checks email settings and the hosted URL before creating a 
   const source = await Deno.readTextFile(
     new URL("./bootstrap-family.ts", import.meta.url),
   );
+  const gate = source.indexOf("assertResetAllowed(");
   const check = source.indexOf("assertReadyToBootstrap(");
   const create = source.indexOf("await findOrCreateUser");
   const rpc = source.indexOf('rpc("bootstrap_family"');
+  const resetRpc = source.indexOf('rpc("reset_unjoined_bootstrap_family"');
+  assertEquals(gate > 0 && gate < check, true);
   assertEquals(check > 0 && create > check && rpc > check, true);
+  assertEquals(resetRpc > gate && create > resetRpc, true);
+  assertEquals(source.includes("email_confirm: true"), true);
+  assertEquals(source.includes("updateUserById"), true);
+  assertEquals(source.includes("email_confirm: false"), false);
 
   withActions("true", () => {
     try {

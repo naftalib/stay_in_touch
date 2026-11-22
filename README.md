@@ -92,7 +92,15 @@ The first family is created on your computer, not in Actions:
 pnpm bootstrap:family --env test --family "The Breuning Family" --email "<first parent>" --label "Mom"
 ```
 
-That reads gitignored `.env.test.local` or `.env.production.local`. Those files need `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `APP_URL`, `EMAIL_TRANSPORT`, `EMAIL_FROM`, and, for Gmail, `GMAIL_SMTP_USER` and `GMAIL_SMTP_PASS`. The command checks the mail settings before it creates anyone. It refuses GitHub Actions when the URL is a hosted project. A local URL is allowed so CI can exercise it. Do not run `supabase/seed.sql` on a hosted project.
+That reads gitignored `.env.test.local` or `.env.production.local`. Those files need `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `APP_URL`, `EMAIL_TRANSPORT`, `EMAIL_FROM`, and, for Gmail, `GMAIL_SMTP_USER` and `GMAIL_SMTP_PASS`. The command checks the mail settings before it creates anyone. It refuses GitHub Actions when the URL is a hosted project. A local URL is allowed so CI can exercise it. The auth user is created already confirmed, so the invite code works while public signup is off. Do not run `supabase/seed.sql` on a hosted project.
+
+On the test project only, an unjoined family can be removed and bootstrapped again:
+
+```bash
+pnpm bootstrap:family --env test --reset --confirm-reset --family "Test Family" --email "<the address already on that invite>"
+```
+
+That refuses `--env production`. It does not delete a family that already has a member.
 
 `pnpm storage-check` prints photo and database percentages only. `scripts/backup.sh` and `scripts/restore.sh` encrypt with `age`. Never restore production data into the test project.
 

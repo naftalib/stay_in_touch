@@ -207,7 +207,9 @@ sequenceDiagram
   Invitee->>PG: accept_invitation(token)
 ```
 
-`invitations.token_hash` is never granted to clients. Resend rotates the hash. Revoke keeps the hash and sets `status = 'revoked'`, so the old link can say the invitation was cancelled while accept still fails. `invite-send` creates the auth user with the email already confirmed (ADR 0060) because signup is closed. `private.cleanup_orphan_invite_auth_users` runs on a daily pg_cron schedule when the extension is available.
+`invitations.token_hash` is never granted to clients. Resend rotates the hash. Revoke keeps the hash and sets `status = 'revoked'`, so the old link can say the invitation was cancelled while accept still fails. `invite-send` and `pnpm bootstrap:family` create the auth user with the email already confirmed (ADR 0060, ADR 0112) because signup is closed. A re-run of bootstrap confirms an existing unconfirmed user instead of leaving the invite code on `signup_disabled`. `private.cleanup_orphan_invite_auth_users` runs on a daily pg_cron schedule when the extension is available.
+
+`public.reset_unjoined_bootstrap_family` is executable only by `service_role`. It deletes one unjoined bootstrap family: the family row, its General space, its single pending invite, its audit rows, and the auth user created for that invite. It refuses a family that has a member, a message, a photo, a sign-in, or any other row. The CLI accepts `--reset --confirm-reset` only for `--env test`, and it refuses production before reading the env file (ADR 0112).
 
 Admin UI routes: `/f/:familyId/members`, `/f/:familyId/spaces`. Public accept route: `/invite` (token in fragment).
 

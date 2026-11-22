@@ -106,20 +106,6 @@ test.describe("First family bootstrap", () => {
     const link = inviteLink(inviteMail);
     expect(link).toBeTruthy();
 
-    // Local Auth has public sign-up off and confirmations off, so GoTrue
-    // answers OTP for an unconfirmed user with "Signups not allowed".
-    // Hosted projects have confirmations on, and this same OTP is what
-    // confirms the user. The database test covers the unconfirmed row.
-    execFileSync(
-      "psql",
-      [
-        "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
-        "-c",
-        `update auth.users set email_confirmed_at = now() where email = '${email}'`,
-      ],
-      { stdio: "ignore" },
-    );
-
     await page.goto(link!);
     await expect(page.getByText(/invited you to join/i)).toBeVisible();
     const otpSentAt = new Date();

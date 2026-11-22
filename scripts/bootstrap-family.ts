@@ -4,17 +4,23 @@
  * GitHub Actions when the project URL is not the local stack.
  *
  * pnpm bootstrap:family --env test|production --family "The Breuning Family" --email person@example.test --label "Mom"
+ *
+ * Test only, to remove an unjoined family and bootstrap a different address:
+ * pnpm bootstrap:family --env test --reset --confirm-reset --family "Test Family" --email person@example.test
  */
 import {
   createClient,
   type SupabaseClient,
+  type User,
 } from "npm:@supabase/supabase-js@2.119.0";
 import { sendEmail } from "../supabase/functions/_shared/email.ts";
 import { buildInviteUrl } from "../supabase/functions/_shared/inviteLink.ts";
 import { buildInviteEmail } from "../supabase/functions/_shared/templates/invite.ts";
 import {
+  assertActionsTargetAllowed,
   assertEnvFileAllowed,
   assertReadyToBootstrap,
+  assertResetAllowed,
   type BootstrapArgs,
   envFilePath,
   loadEnvFile,
@@ -24,6 +30,7 @@ import {
 export {
   assertEnvFileAllowed,
   assertReadyToBootstrap,
+  assertResetAllowed,
   type BootstrapArgs,
   envFilePath,
   loadEnvFile,
@@ -36,6 +43,34 @@ function applyEnv(vars: Record<string, string>): void {
   }
 }
 
+async function findUserByEmail(
+  admin: SupabaseClient,
+  email: string,
+): Promise<User | null> {
+  for (let page = 1; page <= 20; page++) {
+    const listed = await admin.auth.admin.listUsers({ page, perPage: 200 });
+    if (listed.error) throw new Error("could not look up the auth user");
+    const match = listed.data.users.find((user) =>
+      user.email?.toLowerCase() === email.toLowerCase()
+    );
+    if (match?.id) return match;
+    if (listed.data.users.length < 200) break;
+  }
+  return null;
+}
+
+async function confirmUser(admin: SupabaseClient, userId: string): Promise<void> {
+  const updated = await admin.auth.admin.updateUserById(userId, {
+    email_confirm: true,
+  });
+  if (updated.error) throw new Error("could not confirm the auth user");
+}
+
+/**
+ * Public signup is closed. GoTrue treats an unconfirmed address as a signup,
+ * so the invite code returns signup_disabled unless the user is confirmed
+ * (ADR 0060, ADR 0112). A re-run confirms an existing unconfirmed user.
+ */
 async function findOrCreateUser(
   admin: SupabaseClient,
   email: string,
@@ -43,10 +78,15 @@ async function findOrCreateUser(
 ): Promise<string> {
   const created = await admin.auth.admin.createUser({
     email,
-    email_confirm: false,
+    email_confirm: true,
     user_metadata: { display_name: label },
   });
-  if (!created.error && created.data.user?.id) return created.data.user.id;
+  if (!created.error && created.data.user?.id) {
+    if (!created.data.user.email_confirmed_at) {
+      await confirmUser(admin, created.data.user.id);
+    }
+    return created.data.user.id;
+  }
 
   const message = created.error?.message.toLowerCase() ?? "";
   const exists = message.includes("already") ||
@@ -56,22 +96,61 @@ async function findOrCreateUser(
     throw new Error("could not create the auth user");
   }
 
-  for (let page = 1; page <= 20; page++) {
-    const listed = await admin.auth.admin.listUsers({ page, perPage: 200 });
-    if (listed.error) throw new Error("could not look up the auth user");
-    const match = listed.data.users.find((user) =>
-      user.email?.toLowerCase() === email.toLowerCase()
-    );
-    if (match?.id) return match.id;
-    if (listed.data.users.length < 200) break;
+  const match = await findUserByEmail(admin, email);
+  if (!match?.id) throw new Error("could not find the auth user");
+  if (!match.email_confirmed_at) await confirmUser(admin, match.id);
+  return match.id;
+}
+
+async function runReset(args: BootstrapArgs, root: string): Promise<void> {
+  assertResetAllowed(args);
+  const path = envFilePath(args.envName, root);
+  await assertEnvFileAllowed(path);
+  let text: string;
+  try {
+    text = await Deno.readTextFile(path);
+  } catch {
+    throw new Error(`missing ${path}`);
   }
-  throw new Error("could not find the auth user");
+  const vars = loadEnvFile(text);
+  const url = vars.SUPABASE_URL ?? "";
+  const secret = vars.SUPABASE_SECRET_KEY ?? "";
+  if (!url.trim() || !secret.trim()) {
+    throw new Error("env file must set SUPABASE_URL and SUPABASE_SECRET_KEY");
+  }
+  assertActionsTargetAllowed(url);
+
+  const admin = createClient(url, secret, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await admin.rpc("reset_unjoined_bootstrap_family", {
+    p_family_name: args.family,
+    p_email: args.email,
+    p_confirm: "confirm-reset",
+  });
+  if (error) {
+    const detail = error.message.replace(/[\r\n]+/g, " ").slice(0, 240);
+    throw new Error(detail ? `reset failed: ${detail}` : "reset failed");
+  }
+  const removed = data === true ||
+    (Array.isArray(data) && data.length === 1 && data[0] === true);
+  const absent = data === false ||
+    (Array.isArray(data) && data.length === 1 && data[0] === false);
+  if (!removed && !absent) throw new Error("reset failed");
+  console.log(removed ? "test family removed" : "nothing to reset");
 }
 
 export async function runBootstrap(
   args: BootstrapArgs,
   root = Deno.cwd(),
 ): Promise<void> {
+  // Reset never reads a production env file and never creates a user.
+  assertResetAllowed(args);
+  if (args.reset) {
+    await runReset(args, root);
+    return;
+  }
+
   const path = envFilePath(args.envName, root);
   await assertEnvFileAllowed(path);
   let text: string;
